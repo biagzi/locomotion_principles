@@ -1,3 +1,10 @@
+This work was forked from skriegman/reconfigurable_organisms
+Both _voxcad directory (Voxelyze engine and Voxcad) and the files with the evolutionary algorithm implementation were edited.
+Here is maintained just the edited code necessary for replicating simulation and analysis present in the article:
+""
+
+Starting from here, it is the README text from "reconfigurable_organisms":
+
 Installation
 ------------
 
