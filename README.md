@@ -1,6 +1,6 @@
 This work was forked from skriegman/reconfigurable_organisms.
 
-Original content (voxelyze engine and evolutionary algorithm implementation) was modified and new content was added (all files in exp and data_analyzis directory is new). The "reconfigurable_organisms" original content not used in this work was all deleted.
+Original content (voxelyze engine and evolutionary algorithm implementation) was modified and new content was added (all files in exp and data_analyzis directory are new). The "reconfigurable_organisms" original content not used in this work was all deleted.
 
 Here is present the code necessary for replicating simulation, data analysis and plot the figures of the article: BLABLA.
 
