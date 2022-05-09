@@ -4,9 +4,9 @@ Original content (voxelyze engine and evolutionary algorithm implementation) was
 
 Here is present the code necessary for replicating simulation, data analysis and plot the figures of the article: BLABLA.
 
-""
+Starting from here is the original README text from "reconfigurable_organisms":
 
-Starting from here, it is the original README text from "reconfigurable_organisms":
+""
 
 Installation
 ------------
