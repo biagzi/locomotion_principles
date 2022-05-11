@@ -1,7 +1,5 @@
-from os import kill
 import numpy as np
 import re
-import zlib
 from collections import defaultdict
 
 
@@ -76,86 +74,12 @@ def normalize(x):
 
 
 
-
-def compressed_size(a):
-    return len(zlib.compress(a))
-
-
-def bootstrap_ci(a, func, n=5000, ci=95):
-    stats = func(np.random.choice(a, (n, len(a))), axis=1)
-    lower = np.percentile(stats, 100-ci)
-    upper = np.percentile(stats, ci)
-    return lower, upper
-
-
-def vox_id_from_xyz(x, y, z, size):
-    return z*size[0]*size[1] + y*size[0] + x
-
-
 def vox_xyz_from_id(idx, size):
+    """ Used in networks"""
     z = idx / (size[0]*size[1])
     y = (idx - z*size[0]*size[1]) / size[0]
     x = idx - z*size[0]*size[1] - y*size[0]
     return x, y, z
-
-
-def convert_voxelyze_index(v_index, spacing=0.010, start_pos=0.005):
-    return int(v_index/spacing - start_pos)
-
-
-def resize_voxarray(a, pad=2, const=0):
-    if isinstance(pad, int):
-        n_pad = ((pad, pad),)*3  # (n_before, n_after) for each dimension
-    else:
-        n_pad = pad
-    return np.pad(a, pad_width=n_pad, mode='constant', constant_values=const)
-
-
-def get_outer_shell(a):
-    x, y, z = a.shape
-    return [a[0, :, :], a[x-1, :, :], a[:, 0, :], a[:, y-1, :], a[:, :, 0], a[:, :, z-1]]
-
-
-def get_outer_shell_complements(a):
-    x, y, z = a.shape
-    return [a[1:, :, :], a[:x-1, :, :], a[:, 1:, :], a[:, :y-1, :], a[:, :, 1:], a[:, :, :z-1]]
-
-
-def trim_voxarray(a):
-    new = np.array(a)
-    done = False
-    while not done:
-        outer_slices = get_outer_shell(new)
-        inner_slices = get_outer_shell_complements(new)
-        for i, o in zip(inner_slices, outer_slices):
-            if np.sum(o) == 0:
-                new = i
-                break
-
-        voxels_in_shell = [np.sum(s) for s in outer_slices]
-        if 0 not in voxels_in_shell:
-            done = True
-
-    return new
-
-
-
-def reorder_vxa_array(a, size):
-    anew = np.empty(size)
-    for z in range(size[2]):
-        for y in range(size[1]):
-            for x in range(size[0]):
-                anew[x, y, z] = a[z, y*size[0]+x]
-    return anew
-
-
-def array_to_vxa(a):
-    anew = np.empty((a.shape[2], a.shape[1]*a.shape[0]))
-    for z in range(a.shape[2]):
-        for y in range(a.shape[1]):
-            for x in range(a.shape[0]):
-                anew[z, y*a.shape[0]+x] = a[x, y, z]
-    return anew
 
 
 def xml_format(tag):
@@ -167,37 +91,21 @@ def xml_format(tag):
     return tag
 
 
-def get_data_from_xml_line(line, tag, dtype=float):
-    try:
-        return dtype(line[line.find(tag) + len(tag):line.find("</" + tag[1:])])
-    except ValueError:
-        start = line.find(">")
-        end = line.find("</")
-        return dtype(line[start+1:end])
-
 
 def natural_sort(l, reverse):
+    """ Used in checkpoint"""
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(l, key=alphanum_key, reverse=reverse)
 
 
 def find_between(string, start, end):
+    """Used in logging"""
     start = string.index(start) + len(start)
     end = string.index(end, start)
     return string[start:end]
 
 
-def replace_text_in_file(filename, replacements_dict):
-    lines = []
-    with open(filename) as infile:
-        for line in infile:
-            for original, target in replacements_dict.iteritems():
-                line = line.replace(original, target)
-            lines.append(line)
-    with open(filename, 'w') as outfile:
-        for line in lines:
-            outfile.write(line)
 
 
 def dominates(ind1, ind2, attribute_name, maximize):
@@ -224,87 +132,6 @@ def count_feet(x,keys):
     x = x.astype(bool)
 
     return np.sum(np.sum(x, axis = 0),0)[0]
-
-def measure_diversity(x,feet,voxels):
-    """Measure the diversity occurrences of any keys in x."""
-
-    ind_equal_feet = feet.count(np.sum(np.sum(x.astype(bool), axis = 0),0)[0])
-    ind_equal_vox = voxels.count(np.sum(x.astype(bool)))
-    
-    return ind_equal_feet + ind_equal_vox #this number represents robots with equal num of feet and voxels, so I want to minimize it.
-
-def measure_diversity_stronger(x,feet,voxels,MAX_FEET,MAX_VOX):
-    """Measure the diversity occurrences of any keys in x."""
-
-    x_feet = np.sum(np.sum(x.astype(bool), axis = 0),0)[0]
-    x_voxels = np.sum(x.astype(bool))
-
-    feet_diffs = 0
-    voxels_diffs = 0
-
-    for i in range(len(feet)):
-        feet_diffs += np.abs(feet[i] - x_feet)/MAX_FEET #if they all have equal feet, this number = 0; if they have the max diff, this number = 1;
-        voxels_diffs += np.abs(voxels[i] - x_voxels)/MAX_VOX
-
-
-    return feet_diffs + voxels_diffs #(MIN of this sum = 0 (all equall) and MAX (all different)) -> In this case, I want to Maximize
-
-
-def total_diversity(x,all_inds_shape):
-    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population."""
-
-    ind = x.astype(bool)
-    equal_voxels = 0
-
-    for other_ind in all_inds_shape:
-        equal_voxels += np.logical_and(ind,other_ind).sum() #it is not normalized, so it will have a bias to generate smaller inds, 
-        #because smaller inds have a smaller equal_voxels number
-
-
-    return equal_voxels #we want to minimize this number
-
-
-def total_diversity_normalized(x,all_inds_shape):
-
-    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population. 
-    The number of identical voxels is normalized by the total voxels of both shapes"""
-
-    ind = x.astype(bool)
-    equal_voxels = 0
-
-    for other_ind in all_inds_shape:
-        equal_voxels += float(np.logical_and(ind,other_ind).sum())/(float(ind.sum() + other_ind.sum())/2)
-        #if they are totally equal, this num is 1
-
-
-    return equal_voxels #we want to minimize this number
-
-
-def total_diversity_normalized_similar_inds(ind,pop):
-
-    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population. 
-    The number of identical voxels is normalized by the total voxels of both shapes.
-    Totally equal inds (or very similar) are penalized, but x of them are not (so they can keep exploring this space)"""
-
-    SIMILARITY_THRESHOLD = 0.9 #define the robots that will be grouped together as very similar shapes that need to be diversified
-    ind_shape = ind.genotype.to_phenotype_mapping['material']['state'].astype(bool)
-    penalization_by_similarity = 0
-    totally_equal_inds = []
-
-    for other_ind in pop:
-        other_ind_shape = other_ind.genotype.to_phenotype_mapping['material']['state'].astype(bool)
-        ind_other_ind_equal_voxels = float(np.logical_and(ind_shape,other_ind_shape).sum())/(float(ind_shape.sum() + other_ind_shape.sum())/2)
-        if ind_other_ind_equal_voxels >= SIMILARITY_THRESHOLD:
-            totally_equal_inds.append([other_ind.fitness,other_ind.id])
-
-    if len(totally_equal_inds) > 2:
-        totally_equal_inds = sorted(totally_equal_inds, key=lambda x: x[0],reverse=True) #sort by the biggest value of fitness, x[0]
-        for pos, element in enumerate(totally_equal_inds):
-            if element[1] == ind.id and pos > 1: #if the ind is not the first two with higher fitness
-                penalization_by_similarity = pos #the smaller the fitness, the bigger is the penalization
-
-    return penalization_by_similarity  #we want to minimize this number
-
 
 
 def map_genotype_phenotype_direct_encode(this_softbot, *args, **kwargs):
@@ -347,7 +174,7 @@ def map_genotype_phenotype_CPPN(this_softbot, *args, **kwargs):
             if mapping.dependencies[dependency_name]["material_if_false"] is not None:
                 material["state"][mapping.get_dependency(dependency_name, False)] = \
                     mapping.dependencies[dependency_name]["material_if_false"]
-                    
+
     return make_one_shape_only(material["state"]) * material["state"]
 
 
@@ -420,3 +247,159 @@ def make_one_shape_only(output_state, mask=None):
         return one_shape
 
 
+#R: Add patch in morphologies with holes?
+def add_patch(a, loc=None, mat=1):
+    empty_spots_on_surface = np.equal(count_neighbors(a), 1).reshape(a.shape)  # excludes corners
+    patchable = np.greater(count_neighbors(empty_spots_on_surface.astype(int)), 1).reshape(a.shape)  # 2x2 patch
+    patchable = np.logical_and(patchable, empty_spots_on_surface)
+
+    if loc is None:
+        # randomly select a patchable spot on surface
+        rand = np.random.rand(*a.shape)
+        rand[np.logical_not(patchable)] = 0
+        # choice = np.argmax(rand.flatten())
+        # choice = np.unravel_index(choice, a.shape)
+        sorted_locations = [np.unravel_index(r, a.shape) for r in np.argsort(rand.flatten())]
+
+    else:
+        # find patchable closest to desired location
+        indices = np.array([vox_xyz_from_id(idx, a.shape) for idx in np.arange(a.size)])
+        flat_patchable = np.array([patchable[x, y, z] for (x, y, z) in indices])
+        distances = cdist(indices, np.array([loc]))
+        distances[np.logical_not(flat_patchable)] = a.size
+        # closest = np.argmin(distances)
+        # choice = indices[closest]
+        sorted_locations = [indices[d] for d in np.argsort(distances.flatten())]
+
+    # print sorted_locations
+
+    attempt = -1
+    correct_topology = False
+
+    while not correct_topology:
+
+        attempt += 1
+        choice = sorted_locations[attempt]
+
+        neigh = np.array([choice]*6)
+        neigh[0, 0] += 1
+        neigh[1, 0] -= 1
+        neigh[2, 1] += 1
+        neigh[3, 1] -= 1
+        neigh[4, 2] += 1
+        neigh[5, 2] -= 1
+
+        slots = [0]*6
+        for n, (x, y, z) in enumerate(neigh):
+            if a.shape[0] > x > -1 and a.shape[1] > y > -1 and a.shape[2] > z > -1 and patchable[x, y, z]:
+                slots[n] = 1
+
+        # just doing 2x2 patch which means we can't select a row of 3 vox
+        if slots[0] and slots[1]:
+            slots[np.random.randint(2)] = 0
+        if slots[2] and slots[3]:
+            slots[2 + np.random.randint(2)] = 0
+        if slots[4] and slots[5]:
+            slots[4 + np.random.randint(2)] = 0
+
+        # now we should have an L shape of 3 surface voxels, so we need to fill in the open corner to get a 2x2
+        # todo: if patch is positioned between two limbs, which are longer than 2 vox, we can end up with 4 vox here
+        corner_neigh = np.array(choice)
+        if slots[0]:
+            corner_neigh[0] += 1
+        if slots[1]:
+            corner_neigh[0] -= 1
+        if slots[2]:
+            corner_neigh[1] += 1
+        if slots[3]:
+            corner_neigh[1] -= 1
+        if slots[4]:
+            corner_neigh[2] += 1
+        if slots[5]:
+            corner_neigh[2] -= 1
+
+        # add these vox to the structure as "sub voxels"
+        sub_vox = [choice, tuple(corner_neigh)]
+        new = np.array(a)
+        for (x, y, z) in sub_vox:
+            new[x, y, z] = mat
+
+        for s, (x, y, z) in zip(slots, neigh):
+            if s:
+                new[x, y, z] = mat
+                sub_vox += [(x, y, z)]
+
+        # make sure the patch is fully fastened to the body
+        if len(sub_vox) == 2:
+            continue
+
+        # triangulate
+        plane = None
+        for ax in range(3):
+            if sub_vox[0][ax] == sub_vox[1][ax] == sub_vox[2][ax]:
+                plane = ax
+
+        parents = [list(xyz) for xyz in list(sub_vox)]
+        grandchildren = list(parents)
+        test_above, test_below = list(parents[0]), list(parents[0])
+        test_above[plane] += 1
+        xa, ya, za = test_above
+        test_below[plane] -= 1
+        xb, yb, zb = test_below
+
+        if a.shape[0] > xa > -1 and a.shape[1] > ya > -1 and a.shape[2] > za > -1 and a[xa, ya, za]:
+            correct_topology = True
+            parents_above = True
+            # for n in range(len(parents)):
+            #     parents[n][plane] += 1
+            #     grandchildren[n][plane] -= 1
+            #     correct_topology = True
+            #     parents_above = True
+
+        elif a.shape[0] > xb > -1 and a.shape[1] > yb > -1 and a.shape[2] > zb > -1 and a[xb, yb, zb]:
+            correct_topology = True
+            parents_above = False
+            # for n in range(len(parents)):
+            #     parents[n][plane] -= 1
+            #     grandchildren[n][plane] += 1
+            #     correct_topology = True
+            #     parents_above = False
+
+    # also change mat for grandchildren
+    if parents_above:
+        pos = -1
+    else:
+        pos = 1
+
+    for (x, y, z) in grandchildren:
+
+        xx = x
+        yy = y
+        zz = z
+
+        if plane == 0:
+            xx += pos
+        elif plane == 1:
+            yy += pos
+        elif plane == 2:
+            zz += pos
+
+        try:
+            new[max(xx, 0), max(yy, 0), max(zz, 0)] = mat
+        except IndexError:
+            pass
+
+    # parents = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in parents]
+    # children = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in sub_vox]
+    # grandchildren = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in grandchildren]
+
+    # height_off_ground = min(2, get_depths_of_material_from_shell(new, mat)[4])
+    # if height_off_ground > 0:
+    #     new = new[:, :, height_off_ground:]
+    #     new = np.pad(new, pad_width=((0, 0), (0, 0), (0, height_off_ground)), mode='constant', constant_values=0)
+
+    sub_vox_dict = dict()
+    # for p, (c, gc) in zip(parents, zip(children, grandchildren)):
+    #     sub_vox_dict[p] = {c: gc}
+
+    return new, sub_vox_dict
