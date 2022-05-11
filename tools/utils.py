@@ -1,12 +1,9 @@
+from os import kill
 import numpy as np
-import itertools
 import re
 import zlib
 from collections import defaultdict
-import scipy.ndimage as ndimage
-from scipy.spatial.distance import cdist, directed_hausdorff
-from itertools import izip
-from multiprocessing import Process, Pipe
+
 
 
 def identity(x):
@@ -78,9 +75,6 @@ def normalize(x):
     return x
 
 
-def hausdorff_dist(a, b):
-    a, b = np.argwhere(a), np.argwhere(b)
-    return max(directed_hausdorff(a, b)[0], directed_hausdorff(b, a)[0])
 
 
 def compressed_size(a):
@@ -144,31 +138,6 @@ def trim_voxarray(a):
 
     return new
 
-
-def get_depths_of_material_from_shell(a, mat):
-    tmp = a
-    depth = [0]*6
-    done = [False]*6
-
-    while not np.all(done):
-        shell = get_outer_shell(tmp)
-        mat_in_shell = [mat in s for s in shell]
-
-        for n in range(6):
-            if not done[n]:
-                if mat_in_shell[n]:
-                    done[n] = True
-                else:
-                    inner_slices = get_outer_shell_complements(tmp)
-                    tmp = inner_slices[n]
-                    depth[n] += 1
-
-    return depth
-
-
-def get_mat_span(a, mat):
-    depths = get_depths_of_material_from_shell(a, mat)
-    return [a.shape[0]-depths[1]-depths[0], a.shape[1]-depths[3]-depths[2], a.shape[2]-depths[5]-depths[4]]
 
 
 def reorder_vxa_array(a, size):
@@ -248,109 +217,139 @@ def count_occurrences(x, keys):
         active = np.logical_or(active, x == a)
     return active.sum()
 
+def count_feet(x,keys):
 
-def one_muscle(output_state):
-    mat = np.greater(output_state, 0)
-    return make_one_shape_only(mat) * 3
+    """Count the feet occurrences of any keys in x."""
 
+    x = x.astype(bool)
 
-def one_fat(output_state):
-    mat = np.greater(output_state, 0)
-    return make_one_shape_only(mat) * 1
+    return np.sum(np.sum(x, axis = 0),0)[0]
 
+def measure_diversity(x,feet,voxels):
+    """Measure the diversity occurrences of any keys in x."""
 
-def two_muscles(output_state):
-    return np.greater(output_state, 0) + 3
+    ind_equal_feet = feet.count(np.sum(np.sum(x.astype(bool), axis = 0),0)[0])
+    ind_equal_vox = voxels.count(np.sum(x.astype(bool)))
+    
+    return ind_equal_feet + ind_equal_vox #this number represents robots with equal num of feet and voxels, so I want to minimize it.
 
+def measure_diversity_stronger(x,feet,voxels,MAX_FEET,MAX_VOX):
+    """Measure the diversity occurrences of any keys in x."""
 
-def muscle_fat(output_state, empty_less_than=-0.1, fat_greater_than=0.1):
-    empty = np.less_equal(output_state, empty_less_than)
-    fat = np.greater_equal(output_state, fat_greater_than)
-    mat = 3*np.ones_like(output_state)
-    mat[fat] = 1
-    mat[empty] = 0
-    return mat
+    x_feet = np.sum(np.sum(x.astype(bool), axis = 0),0)[0]
+    x_voxels = np.sum(x.astype(bool))
 
+    feet_diffs = 0
+    voxels_diffs = 0
 
-def muscle_fat_bone(output_state):
-    muscle = np.greater_equal(output_state, 1/2.)
-    fat = np.greater_equal(output_state, 0)
-    bone = np.greater_equal(output_state, -1/2.)
-    mat = np.zeros_like(output_state)
-    mat[bone] += 1
-    mat[fat] += 1
-    mat[muscle] += 1
-    return mat
+    for i in range(len(feet)):
+        feet_diffs += np.abs(feet[i] - x_feet)/MAX_FEET #if they all have equal feet, this number = 0; if they have the max diff, this number = 1;
+        voxels_diffs += np.abs(voxels[i] - x_voxels)/MAX_VOX
 
 
-def contiguous_material(output_state, *args, **kwargs):
-    return make_one_shape_only(output_state) * output_state
+    return feet_diffs + voxels_diffs #(MIN of this sum = 0 (all equall) and MAX (all different)) -> In this case, I want to Maximize
 
 
-def discretize_material(output_state, num_materials=4, *args, **kwargs):
-    """Discretize outputs into bins, one for each material."""
-    bins = np.linspace(-1, 1, num=num_materials+1)
-    return make_one_shape_only(output_state) * np.digitize(output_state, bins)
+def total_diversity(x,all_inds_shape):
+    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population."""
+
+    ind = x.astype(bool)
+    equal_voxels = 0
+
+    for other_ind in all_inds_shape:
+        equal_voxels += np.logical_and(ind,other_ind).sum() #it is not normalized, so it will have a bias to generate smaller inds, 
+        #because smaller inds have a smaller equal_voxels number
 
 
-def make_material_tree(this_softbot, *args, **kwargs):
+    return equal_voxels #we want to minimize this number
+
+
+def total_diversity_normalized(x,all_inds_shape):
+
+    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population. 
+    The number of identical voxels is normalized by the total voxels of both shapes"""
+
+    ind = x.astype(bool)
+    equal_voxels = 0
+
+    for other_ind in all_inds_shape:
+        equal_voxels += float(np.logical_and(ind,other_ind).sum())/(float(ind.sum() + other_ind.sum())/2)
+        #if they are totally equal, this num is 1
+
+
+    return equal_voxels #we want to minimize this number
+
+
+def total_diversity_normalized_similar_inds(ind,pop):
+
+    """Measure the diversity of a ind comparing its shape matrix with each other individual in the population. 
+    The number of identical voxels is normalized by the total voxels of both shapes.
+    Totally equal inds (or very similar) are penalized, but x of them are not (so they can keep exploring this space)"""
+
+    SIMILARITY_THRESHOLD = 0.9 #define the robots that will be grouped together as very similar shapes that need to be diversified
+    ind_shape = ind.genotype.to_phenotype_mapping['material']['state'].astype(bool)
+    penalization_by_similarity = 0
+    totally_equal_inds = []
+
+    for other_ind in pop:
+        other_ind_shape = other_ind.genotype.to_phenotype_mapping['material']['state'].astype(bool)
+        ind_other_ind_equal_voxels = float(np.logical_and(ind_shape,other_ind_shape).sum())/(float(ind_shape.sum() + other_ind_shape.sum())/2)
+        if ind_other_ind_equal_voxels >= SIMILARITY_THRESHOLD:
+            totally_equal_inds.append([other_ind.fitness,other_ind.id])
+
+    if len(totally_equal_inds) > 2:
+        totally_equal_inds = sorted(totally_equal_inds, key=lambda x: x[0],reverse=True) #sort by the biggest value of fitness, x[0]
+        for pos, element in enumerate(totally_equal_inds):
+            if element[1] == ind.id and pos > 1: #if the ind is not the first two with higher fitness
+                penalization_by_similarity = pos #the smaller the fitness, the bigger is the penalization
+
+    return penalization_by_similarity  #we want to minimize this number
+
+
+
+def map_genotype_phenotype_direct_encode(this_softbot, *args, **kwargs):
+    mapping = this_softbot.to_phenotype_mapping
+    material = mapping["material"]
+    if material["dependency_order"] is not None: 
+        for dependency_name in material["dependency_order"]:
+            mapping.dependencies[dependency_name]["state"] = material["state"] > 0 
+
+    if material["dependency_order"] is not None: 
+        if mapping.dependencies[dependency_name]["material_if_true"] is not None: 
+            material["state"][mapping.get_dependency(dependency_name, True)] = \
+                mapping.dependencies[dependency_name]["material_if_true"]
+    
+        if mapping.dependencies[dependency_name]["material_if_false"] is not None:
+            material["state"][mapping.get_dependency(dependency_name, False)] = \
+                mapping.dependencies[dependency_name]["material_if_false"]
+    return make_one_shape_only(material["state"]) * material["state"]
+
+
+def map_genotype_phenotype_CPPN(this_softbot, *args, **kwargs):
 
     mapping = this_softbot.to_phenotype_mapping
     material = mapping["material"]
 
     if material["dependency_order"] is not None:
-        for dependency_name in material["dependency_order"]:
-            for network in this_softbot:
-                if dependency_name in network.graph.nodes():
-                    mapping.dependencies[dependency_name]["state"] = network.graph.node[dependency_name]["state"] > 0
+        for dependency_name in material["dependency_order"]: 
+            for network in this_softbot: 
+                if dependency_name in network.graph.nodes(): 
+                    mapping.dependencies[dependency_name]["state"] = network.graph.node[dependency_name]["state"] - np.mean(network.graph.node[dependency_name]["state"]) > 0 
+
 
     if material["dependency_order"] is not None:
-        for dependency_name in reversed(material["dependency_order"]):
-            if mapping.dependencies[dependency_name]["material_if_true"] is not None:
+        for dependency_name in reversed(material["dependency_order"]): 
+            
+            if mapping.dependencies[dependency_name]["material_if_true"] is not None: 
                 material["state"][mapping.get_dependency(dependency_name, True)] = \
                     mapping.dependencies[dependency_name]["material_if_true"]
 
             if mapping.dependencies[dependency_name]["material_if_false"] is not None:
                 material["state"][mapping.get_dependency(dependency_name, False)] = \
                     mapping.dependencies[dependency_name]["material_if_false"]
-
+                    
     return make_one_shape_only(material["state"]) * material["state"]
 
-
-def make_material_tree_single_muscle_patches(this_softbot, *args, **kwargs):
-
-    mapping = this_softbot.to_phenotype_mapping
-    material = mapping["material"]
-
-    # for name, details in mapping.items():
-    #     if details["dependency_order"] is not None:
-    for dependency_name in material["dependency_order"]:
-        for network in this_softbot:
-            if dependency_name in network.graph.nodes():
-                mapping.dependencies[dependency_name]["state"] = network.graph.node[dependency_name]["state"] > 0
-
-    # for name, details in mapping.items():
-    #     if details["dependency_order"] is not None:
-    for dependency_name in reversed(material["dependency_order"]):
-        if mapping.dependencies[dependency_name]["material_if_true"] is not None:
-            tmpState = mapping.get_dependency(dependency_name, True)
-            if dependency_name == "muscleType":
-                tmpState = make_one_shape_only(tmpState)
-            material["state"][tmpState] = mapping.dependencies[dependency_name]["material_if_true"]
-
-        if mapping.dependencies[dependency_name]["material_if_false"] is not None:
-            tmpState = mapping.get_dependency(dependency_name, False)
-            if dependency_name == "muscleType":
-                tmpState = make_one_shape_only(tmpState)
-                material["state"][ndimage.morphology.binary_dilation(tmpState)] = "1"
-                # print "tmpState:"
-                # print tmpState
-                # print "dilated:"
-                # print ndimage.morphology.binary_dilation(tmpState)
-            material["state"][tmpState] = mapping.dependencies[dependency_name]["material_if_false"]
-
-    # return details["state"]
-    return make_one_shape_only(material["state"]) * material["state"]
 
 
 def make_one_shape_only(output_state, mask=None):
@@ -380,6 +379,7 @@ def make_one_shape_only(output_state, mask=None):
 
     one_shape = np.zeros(output_state.shape, dtype=np.int32)
 
+    
     if np.sum(mask(output_state)) < 2:
         one_shape[np.where(mask(output_state))] = 1
         return one_shape
@@ -419,337 +419,4 @@ def make_one_shape_only(output_state, mask=None):
 
         return one_shape
 
-
-def count_neighbors(output_state, mask=None):
-    """Count neighbors of each 3D element after applying boolean mask.
-
-    Parameters
-    ----------
-    output_state : numpy.ndarray
-        Network output
-
-    mask : bool mask
-        Threshold function applied to output_state
-
-    Returns
-    -------
-    num_of_neighbors : list
-        Count of True elements surrounding an individual in 3D space.
-
-    """
-    if mask is None:
-        def mask(u): return np.greater(u, 0)
-
-    presence = mask(output_state)
-    voxels = list(itertools.product(*[range(x) for x in output_state.shape]))
-    num_neighbors = [0 for _ in voxels]
-
-    for idx, (x, y, z) in enumerate(voxels):
-        for neighbor in [(x+1, y, z), (x-1, y, z), (x, y+1, z), (x, y-1, z), (x, y, z+1), (x, y, z-1)]:
-            if neighbor in voxels:
-                num_neighbors[idx] += presence[neighbor]
-
-    return num_neighbors
-
-
-def get_neighbors(a):
-    b = np.pad(a, pad_width=1, mode='constant', constant_values=0)
-    neigh = np.concatenate((
-        b[2:, 1:-1, 1:-1, None], b[:-2, 1:-1, 1:-1, None],
-        b[1:-1, 2:, 1:-1, None], b[1:-1, :-2, 1:-1, None],
-        b[1:-1, 1:-1, 2:, None], b[1:-1, 1:-1, :-2, None]), axis=3)
-    return neigh
-
-
-def add_patch(a, loc=None, mat=1):
-    empty_spots_on_surface = np.equal(count_neighbors(a), 1).reshape(a.shape)  # excludes corners
-    patchable = np.greater(count_neighbors(empty_spots_on_surface.astype(int)), 1).reshape(a.shape)  # 2x2 patch
-    patchable = np.logical_and(patchable, empty_spots_on_surface)
-
-    if loc is None:
-        # randomly select a patchable spot on surface
-        rand = np.random.rand(*a.shape)
-        rand[np.logical_not(patchable)] = 0
-        # choice = np.argmax(rand.flatten())
-        # choice = np.unravel_index(choice, a.shape)
-        sorted_locations = [np.unravel_index(r, a.shape) for r in np.argsort(rand.flatten())]
-
-    else:
-        # find patchable closest to desired location
-        indices = np.array([vox_xyz_from_id(idx, a.shape) for idx in np.arange(a.size)])
-        flat_patchable = np.array([patchable[x, y, z] for (x, y, z) in indices])
-        distances = cdist(indices, np.array([loc]))
-        distances[np.logical_not(flat_patchable)] = a.size
-        # closest = np.argmin(distances)
-        # choice = indices[closest]
-        sorted_locations = [indices[d] for d in np.argsort(distances.flatten())]
-
-    # print sorted_locations
-
-    attempt = -1
-    correct_topology = False
-
-    while not correct_topology:
-
-        attempt += 1
-        choice = sorted_locations[attempt]
-
-        neigh = np.array([choice]*6)
-        neigh[0, 0] += 1
-        neigh[1, 0] -= 1
-        neigh[2, 1] += 1
-        neigh[3, 1] -= 1
-        neigh[4, 2] += 1
-        neigh[5, 2] -= 1
-
-        slots = [0]*6
-        for n, (x, y, z) in enumerate(neigh):
-            if a.shape[0] > x > -1 and a.shape[1] > y > -1 and a.shape[2] > z > -1 and patchable[x, y, z]:
-                slots[n] = 1
-
-        # just doing 2x2 patch which means we can't select a row of 3 vox
-        if slots[0] and slots[1]:
-            slots[np.random.randint(2)] = 0
-        if slots[2] and slots[3]:
-            slots[2 + np.random.randint(2)] = 0
-        if slots[4] and slots[5]:
-            slots[4 + np.random.randint(2)] = 0
-
-        # now we should have an L shape of 3 surface voxels, so we need to fill in the open corner to get a 2x2
-        # todo: if patch is positioned between two limbs, which are longer than 2 vox, we can end up with 4 vox here
-        corner_neigh = np.array(choice)
-        if slots[0]:
-            corner_neigh[0] += 1
-        if slots[1]:
-            corner_neigh[0] -= 1
-        if slots[2]:
-            corner_neigh[1] += 1
-        if slots[3]:
-            corner_neigh[1] -= 1
-        if slots[4]:
-            corner_neigh[2] += 1
-        if slots[5]:
-            corner_neigh[2] -= 1
-
-        # add these vox to the structure as "sub voxels"
-        sub_vox = [choice, tuple(corner_neigh)]
-        new = np.array(a)
-        for (x, y, z) in sub_vox:
-            new[x, y, z] = mat
-
-        for s, (x, y, z) in zip(slots, neigh):
-            if s:
-                new[x, y, z] = mat
-                sub_vox += [(x, y, z)]
-
-        # make sure the patch is fully fastened to the body
-        if len(sub_vox) == 2:
-            continue
-
-        # triangulate
-        plane = None
-        for ax in range(3):
-            if sub_vox[0][ax] == sub_vox[1][ax] == sub_vox[2][ax]:
-                plane = ax
-
-        parents = [list(xyz) for xyz in list(sub_vox)]
-        grandchildren = list(parents)
-        test_above, test_below = list(parents[0]), list(parents[0])
-        test_above[plane] += 1
-        xa, ya, za = test_above
-        test_below[plane] -= 1
-        xb, yb, zb = test_below
-
-        if a.shape[0] > xa > -1 and a.shape[1] > ya > -1 and a.shape[2] > za > -1 and a[xa, ya, za]:
-            correct_topology = True
-            parents_above = True
-            # for n in range(len(parents)):
-            #     parents[n][plane] += 1
-            #     grandchildren[n][plane] -= 1
-            #     correct_topology = True
-            #     parents_above = True
-
-        elif a.shape[0] > xb > -1 and a.shape[1] > yb > -1 and a.shape[2] > zb > -1 and a[xb, yb, zb]:
-            correct_topology = True
-            parents_above = False
-            # for n in range(len(parents)):
-            #     parents[n][plane] -= 1
-            #     grandchildren[n][plane] += 1
-            #     correct_topology = True
-            #     parents_above = False
-
-    # also change mat for grandchildren
-    if parents_above:
-        pos = -1
-    else:
-        pos = 1
-
-    for (x, y, z) in grandchildren:
-
-        xx = x
-        yy = y
-        zz = z
-
-        if plane == 0:
-            xx += pos
-        elif plane == 1:
-            yy += pos
-        elif plane == 2:
-            zz += pos
-
-        try:
-            new[max(xx, 0), max(yy, 0), max(zz, 0)] = mat
-        except IndexError:
-            pass
-
-    # parents = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in parents]
-    # children = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in sub_vox]
-    # grandchildren = [vox_id_from_xyz(x, y, z, a.shape) for (x, y, z) in grandchildren]
-
-    # height_off_ground = min(2, get_depths_of_material_from_shell(new, mat)[4])
-    # if height_off_ground > 0:
-    #     new = new[:, :, height_off_ground:]
-    #     new = np.pad(new, pad_width=((0, 0), (0, 0), (0, height_off_ground)), mode='constant', constant_values=0)
-
-    sub_vox_dict = dict()
-    # for p, (c, gc) in zip(parents, zip(children, grandchildren)):
-    #     sub_vox_dict[p] = {c: gc}
-
-    return new, sub_vox_dict
-
-
-def quadruped(shape, cut_leg=None, half_cut=False, double_cut=False, pad=0,  height_above_waist=0,
-              x_depth_beyond_midline=-1, y_depth_beyond_midline=-1, mat=9, patch_mat=8):
-
-    bot = np.ones(shape, dtype=int)*mat
-    adj0 = shape[0] % 2 == 0
-    adj1 = shape[1] % 2 == 0
-
-    # legs to keep
-    front_right_leg = [range(shape[2]/2 + height_above_waist),
-                       range(shape[0]/2 - x_depth_beyond_midline, shape[0]),
-                       range(shape[1]/2 + 1 + y_depth_beyond_midline - adj1)]
-
-    front_left_leg = [range(shape[2]/2 + height_above_waist),
-                      range(shape[0]/2 + 1 + x_depth_beyond_midline - adj0),
-                      range(shape[1]/2 + 1 + y_depth_beyond_midline - adj1)]
-
-    back_right_leg = [range(shape[2]/2 + height_above_waist),
-                      range(shape[0]/2 - x_depth_beyond_midline, shape[0]),
-                      range(shape[1]/2 - y_depth_beyond_midline, shape[1])]
-
-    back_left_leg = [range(shape[2]/2 + height_above_waist),
-                     range(shape[0]/2+1 + x_depth_beyond_midline - adj0),
-                     range(shape[1]/2 - y_depth_beyond_midline, shape[1])]
-
-    legs = [front_right_leg, front_left_leg, back_right_leg, back_left_leg]
-
-    if cut_leg is not None:
-        deleted_leg = legs[cut_leg]
-        deleted_leg[0] = range(double_cut, shape[2]/2 + height_above_waist - half_cut + double_cut)
-        del legs[cut_leg]
-
-    # delete non-leg vox below waist
-    for z in range(shape[2]/2 + height_above_waist):
-        for x in range(shape[0]):
-            for y in range(shape[1]):
-                if bot[x, y, z]:
-                    bot[x, y, z] = 0
-
-    # put back legs
-    for selected_leg in legs:
-        for z in selected_leg[0]:
-            for x in selected_leg[1]:
-                for y in selected_leg[2]:
-                    bot[x, y, z] = mat
-
-    # scar tissue
-    if cut_leg is not None:
-        for z in deleted_leg[0]:
-            for x in deleted_leg[1]:
-                for y in deleted_leg[2]:
-                    bot[x, y, z] = patch_mat
-
-    if pad > 0:
-        bot = np.pad(bot, pad_width=pad, mode='constant', constant_values=0)
-        bot = bot[:, :, 1:]
-
-    # put back stump
-    if half_cut and cut_leg is not None:
-        for z in range(shape[2]/2 + height_above_waist + pad):
-            for x in deleted_leg[1]:
-                for y in deleted_leg[2]:
-                    if z < max(pad, 1):
-                        bot[x + pad, y + pad, z] = patch_mat
-                    else:
-                        bot[x+pad, y+pad, z] = mat
-
-    return bot
-
-
-def n_ped(shape, n, radius, cut_leg=None, pad=0, mat=9, mid_peg=True):
-
-    bot = np.ones(shape, dtype=int)*mat
-    # bot[:, :, -1:] = 1
-    # bot[shape[0]/2, :, :] = 2  # support
-    # bot[:, shape[1]/2, :] = 2  # support
-    bot[:, :, :shape[2]/2] = 0  # delete vox below waist
-    for x in range(shape[0]):
-        for y in range(shape[1]):
-            for z in range(shape[2]):
-                if (x-shape[0]/2)**2 + (y-shape[1]/2)**2 > radius**2+pad:
-                    bot[x, y, z] = 0
-
-    if mid_peg:
-        bot[shape[0]/2-1:shape[0]/2+2, shape[1]/2, :shape[2]/2] = mat
-        bot[shape[0]/2, shape[1]/2-1:shape[1]/2+2, :shape[2]/2] = mat
-
-    delta = 2*np.pi/float(n)
-    for leg in range(n):
-        if leg != cut_leg:
-            theta = delta * leg
-            x_pos = np.cos(theta) * radius
-            y_pos = np.sin(theta) * radius
-            bot[int(x_pos+shape[0]/2), int(y_pos+shape[1]/2), :shape[2]/2] = mat
-
-            if x_pos < shape[0]/2:
-                bot[int(x_pos+shape[0]/2)+1, int(y_pos+shape[1]/2), :shape[2]/2] = mat
-
-                if y_pos < shape[1]/2:
-                    bot[int(x_pos+shape[0]/2)+1, int(y_pos+shape[1]/2)+1, :shape[2]/2] = mat
-                    bot[int(x_pos+shape[0]/2), int(y_pos+shape[1]/2)+1, :shape[2]/2] = mat
-                else:
-                    bot[int(x_pos+shape[0]/2)+1, int(y_pos+shape[1]/2)-1, :shape[2]/2] = mat
-                    bot[int(x_pos+shape[0]/2), int(y_pos+shape[1]/2)-1, :shape[2]/2] = mat
-            else:
-                bot[int(x_pos+shape[0]/2)-1, int(y_pos+shape[1]/2), :shape[2]/2] = mat
-                bot[int(x_pos+shape[0]/2)-1, int(y_pos+shape[1]/2)-1, :shape[2]/2] = mat
-                bot[int(x_pos+shape[0]/2), int(y_pos+shape[1]/2)-1, :shape[2]/2] = mat
-
-    if pad > 0:
-        bot = np.pad(bot, pad_width=pad, mode='constant', constant_values=0)
-        # bot = np.pad(bot, pad_width=((pad, pad), (pad, pad), (0, pad*2)), mode='constant', constant_values=0)
-
-    return bot
-
-
-def spawn(f):
-    def fun(pipe, x):
-        pipe.send(f(x))
-        pipe.close()
-
-    while True:
-        try:
-            return fun
-        except IOError as e:
-            print e
-            continue
-
-
-def parmap(f, X):
-    pipe = [Pipe() for x in X]
-    proc = [Process(target=spawn(f), args=(c, x)) for x, (p, c) in izip(X, pipe)]
-    [p.start() for p in proc]
-    [p.join() for p in proc]
-    return [p.recv() for (p, c) in pipe]
 
