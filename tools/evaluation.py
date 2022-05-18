@@ -6,15 +6,6 @@ import os
 from read_write_voxelyze import read_voxlyze_results, write_voxelyze_file
 
 
-# TODO: make eval times relative to the number of simulated voxels
-# TODO: right now just saving files gen-id-fitness; but this should be more flexible (as option in objective dict?)
-# TODO: fitness isn't even necessarily the name of the top objective --> use pop.objective_dict[0]["name"] (?)
-# getattr(ind, pop.objective_dict[0]["name"])
-# TODO: the location of voxelyze and the data must be consistent and specified or more robust (cp for now)
-# sub.call("cp ../_voxcad/voxelyzeMain/voxelyze .", shell=True)
-# sub.call("cp ../_voxcad/qhull .", shell=True)
-
-
 def evaluate_all(sim, env, pop, print_log, save_vxa_every, run_directory, run_name, max_eval_time=60,
                  time_to_try_again=10, save_lineages=False, batch_size=None):
     """Evaluate all individuals of the population in VoxCad.
