@@ -401,6 +401,19 @@ def write_voxelyze_file(sim, env, individual, run_directory, run_name):
         <AggregateDragCoefficient>" + str(int(env.aggregate_drag_coefficient)) + "</AggregateDragCoefficient>\n\
         </Environment>\n")
 
+    #Defines the different material types in Palette
+    #Material ID = 1 = fat (passivee)
+    #Material ID = 2 = bone
+    #Material ID = 3 = muscle with phase 0.01 (CTE)
+    #Material ID = 4 = muscle with phase -0.01 (CTE)
+    #And other types ...
+    try:
+        this_robot_stiffness = individual.genotype[2].feature
+        string_for_md5 = str(this_robot_stiffness)
+    except:
+        this_robot_stiffness = env.muscle_stiffness
+        string_for_md5 = "" 
+
     voxelyze_file.write(
         "<VXC Version=\"0.93\">\n\
         <Lattice>\n\
@@ -468,7 +481,7 @@ def write_voxelyze_file(sim, env, individual, run_directory, run_name):
             <uDynamic>0.5</uDynamic>\n\
             </Mechanical>\n\
         </Material>\n\
-            <Material ID=\"3\">\n\
+        <Material ID=\"3\">\n\
             <MatType>0</MatType>\n\
             <Name>Active_+</Name>\n\
             <Display>\n\
@@ -614,16 +627,16 @@ def write_voxelyze_file(sim, env, individual, run_directory, run_name):
         </Material>\n\
         <Material ID=\"9\">\n\
             <MatType>0</MatType>\n\
-            <Name>Base</Name>\n\
+            <Name>Active_+</Name>\n\
             <Display>\n\
             <Red>1</Red>\n\
-            <Green>0.078</Green>\n\
-            <Blue>0.576</Blue>\n\
+            <Green>0</Green>\n\
+            <Blue>0</Blue>\n\
             <Alpha>1</Alpha>\n\
             </Display>\n\
             <Mechanical>\n\
             <MatModel>0</MatModel>\n\
-            <Elastic_Mod>" + str(env.muscle_stiffness) + "</Elastic_Mod>\n\
+            <Elastic_Mod>" + str(this_robot_stiffness) + "</Elastic_Mod>\n\
             <Plastic_Mod>0</Plastic_Mod>\n\
             <Yield_Stress>0</Yield_Stress>\n\
             <FailModel>0</FailModel>\n\
@@ -742,7 +755,7 @@ def write_voxelyze_file(sim, env, individual, run_directory, run_name):
         voxelyze_file.write("</Data>\n")
 
     # append custom parameters
-    string_for_md5 = ""
+    #string_for_md5 = "" moved to the stifness part
 
     for name, details in individual.genotype.to_phenotype_mapping.items():
         if ("Synapse" not in details["tag"]) and ("FakeTag" not in details["tag"]):
