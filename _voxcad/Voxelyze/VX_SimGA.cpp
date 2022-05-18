@@ -91,7 +91,7 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML, CVX_SimGA* simToCombine)
 	}
 
 
-	pXML->DownLevel("Voxelyze_Sim_Result");
+	pXML->DownLevel("Voxelyze_Sim_Result_Renata");
 	pXML->SetElAttribute("Version", "1.0");
 	pXML->DownLevel("Fitness");
 	pXML->Element("VoxelNumber", numVoxels);
@@ -126,6 +126,10 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML, CVX_SimGA* simToCombine)
 		pXML->Element("avgStiffChange1", avgStiffChange1);
 		pXML->Element("avgStiffChange2", avgStiffChange2);
 	//}
+	int convertdataVOXEL = static_cast<int>(SS.VoxelIndexTrace.size());
+	int convertdataTIME = static_cast<int>(SS.CMTraceTime.size());
+	pXML->Element("convertdataVOXEL", convertdataVOXEL);
+	pXML->Element("convertdataTIME", convertdataTIME);
 	
 	pXML->UpLevel();
 
@@ -135,7 +139,7 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML, CVX_SimGA* simToCombine)
             for(std::vector<vfloat>::size_type i = 0; i != SS.CMTraceTime.size(); ++i)
             {
                 pXML->DownLevel("TraceStep");
-                    pXML->Element("Time",SS.CMTraceTime[i]);
+                    pXML->Element("CMTime",SS.CMTraceTime[i]);
                     pXML->Element("TraceX",SS.CMTrace[i].x);
                     pXML->Element("TraceY",SS.CMTrace[i].y);
                     pXML->Element("TraceZ",SS.CMTrace[i].z);
@@ -144,29 +148,44 @@ void CVX_SimGA::WriteResultFile(CXML_Rip* pXML, CVX_SimGA* simToCombine)
             }
         pXML->UpLevel();
 
-//        pXML->DownLevel("SensorMotorData");
-//        for(std::vector<vfloat>::size_type i = 0; i != SS.VoxelIndexTrace.size(); ++i)
-//        {
-//            pXML->DownLevel("Voxel");
-//                pXML->Element("X", SS.VoxelIndexTrace[i].x);
-//                pXML->Element("Y", SS.VoxelIndexTrace[i].y);
-//                pXML->Element("Z", SS.VoxelIndexTrace[i].z);
-//                pXML->Element("Voltage", SS.VoltageTrace[i]);
-//                pXML->Element("Strain", SS.StrainTrace[i]);
-//                pXML->Element("Stress", SS.StressTrace[i]);
-//                pXML->Element("Pressure", SS.PressureTrace[i]);
-//                pXML->Element("Touch", SS.TouchTrace[i]);
-//                pXML->Element("Roll", SS.RollTrace[i]);
-//                pXML->Element("Pitch", SS.PitchTrace[i]);
-//                pXML->Element("Yaw", SS.YawTrace[i]);
-//            pXML->UpLevel();
-//        }
-//        pXML->UpLevel();
+       pXML->DownLevel("SensorMotorData");
+	   int j=0;
+       for(std::vector<vfloat>::size_type i = 0; i != SS.VoxelIndexTrace.size(); ++i)
+       {	
+           pXML->DownLevel("Voxel");
+			if (i % numVoxels == 0)
+				if (i>0)
+					j = j + 1;
+			pXML->Element("Time",SS.CMTraceTime[j]);
+			pXML->Element("VoxelIndex", SS.VoltageTrace[i]);
+		//pXML->Element("RenataVoxelIndex", SS.VoxelIndexTraceReference[i]);
+			pXML->Element("InitialXm", SS.VoxelIndexTrace[i].x);
+			pXML->Element("InitialYm", SS.VoxelIndexTrace[i].y);
+			pXML->Element("InitialZm", SS.VoxelIndexTrace[i].z);
+			pXML->Element("InitialX", SS.RollTrace[i]);
+			pXML->Element("InitialY", SS.PitchTrace[i]);
+			pXML->Element("InitialZ", SS.YawTrace[i]);
+			pXML->Element("TouchTrace", SS.TouchTrace[i]);
+
+			pXML->Element("XCurrentPosition", SS.StrainTrace[i]);
+			pXML->Element("YCurrentPosition", SS.StressTrace[i]);
+			pXML->Element("ZCurrentPosition", SS.PressureTrace[i]);
+
+            // //    pXML->Element("Strain", SS.StrainTrace[i]);
+            // //    pXML->Element("Stress", SS.StressTrace[i]);
+            //    pXML->Element("Pressure", SS.PressureTrace[i]);
+			// //    pXML->Element("Voltage", SS.VoltageTrace[i]);
+            //    pXML->Element("XPos", SS.RollTrace[i]);
+            //    pXML->Element("YPos", SS.PitchTrace[i]);
+            //    pXML->Element("ZPos", SS.YawTrace[i]);
+           pXML->UpLevel();
+       }
+       pXML->UpLevel();
     }
 
 	pXML->UpLevel();
 
-	// std::cout << "dist: " << dist/LocalVXC.GetLatticeDim()  << std::endl;
+	
 	// // std::cout << "height: " << COMZ << std::endl;
 	// std::cout << "fitness: " << dist/LocalVXC.GetLatticeDim() * COMZ << std::endl;
 

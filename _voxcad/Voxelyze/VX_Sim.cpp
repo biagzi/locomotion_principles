@@ -336,7 +336,7 @@ void CVX_Sim::ClearAll(void) //Reset all initialized variables
 	XtoSIndexMap.clear();
 	StoXIndexMap.clear();
 	SurfVoxels.clear();
-
+	
 	MaxDispSinceLastBondUpdate = (vfloat)FLT_MAX; //arbitrarily high as a flag to populate bonds
 
 	ClearHistories();
@@ -1373,6 +1373,7 @@ bool CVX_Sim::UpdateStats(std::string* pRetMessage) //updates simulation state (
         SS.CMTraceTime.clear();
         SS.CMTrace.clear();
         SS.VoxelIndexTrace.clear();
+		//SS.VoxelIndexTraceReference.clear();
         SS.FloorTouchTrace.clear();
         SS.VoltageTrace.clear();
         SS.StrainTrace.clear();
@@ -1388,19 +1389,37 @@ bool CVX_Sim::UpdateStats(std::string* pRetMessage) //updates simulation state (
         SS.CMTrace.push_back( GetCM() );
 
         int numTouchingGround = 0;
+		int x,y,z;
 
         for (int i=0; i<NumVox(); i++)
         {
             if (VoxArray[i].GetCurGroundPenetration() > 0){ numTouchingGround += 1;}
-            SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
-            SS.VoltageTrace.push_back(VoxArray[i].Voltage);
-            SS.StrainTrace.push_back(VoxArray[i].GetMaxBondStrain());
-            SS.StressTrace.push_back(VoxArray[i].GetMaxBondStress());
-            SS.PressureTrace.push_back(VoxArray[i].CalcVoxelPressure());
-            SS.TouchTrace.push_back(VoxArray[i].GetCurGroundPenetration());
-            SS.RollTrace.push_back(VoxArray[i].GetRoll());
-            SS.PitchTrace.push_back(VoxArray[i].GetPitch());
-            SS.YawTrace.push_back(VoxArray[i].GetYaw());
+			LocalVXC.GetXYZNom(&x, &y, &z, StoXIndexMap[i]); 
+
+			SS.VoltageTrace.push_back(StoXIndexMap[i]);
+
+			SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
+
+			SS.RollTrace.push_back(x); 
+			SS.PitchTrace.push_back(y);
+			SS.YawTrace.push_back(z); 
+
+			SS.StrainTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().x);
+			SS.StressTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().y);
+			SS.PressureTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().z);
+			SS.TouchTrace.push_back(VoxArray[i].GetCurGroundPenetration());
+
+
+            // SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
+			//SS.VoxelIndexTraceReference.push_back(VoxArray[i].GetSimIndex()); //Renata adds but did not worked
+            // SS.VoltageTrace.push_back(VoxArray[i].Voltage);
+            // SS.StrainTrace.push_back(VoxArray[i].GetMaxBondStrain());
+            // SS.StressTrace.push_back(VoxArray[i].GetMaxBondStress());
+            // SS.PressureTrace.push_back(VoxArray[i].CalcVoxelPressure());
+            // 
+            // SS.RollTrace.push_back(VoxArray[i].GetRoll());
+            // SS.PitchTrace.push_back(VoxArray[i].GetPitch());
+            // SS.YawTrace.push_back(VoxArray[i].GetYaw());
         }
 
         SS.FloorTouchTrace.push_back(numTouchingGround);
@@ -1417,19 +1436,37 @@ bool CVX_Sim::UpdateStats(std::string* pRetMessage) //updates simulation state (
             SS.CMTrace.push_back( GetCM() );
 
             int numTouchingGround = 0;
-
+			int x,y,z;
+			
             for (int i=0; i<NumVox(); i++)
             {
                 if (VoxArray[i].GetCurGroundPenetration() > 0){ numTouchingGround += 1;}
-                SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
-                SS.VoltageTrace.push_back(VoxArray[i].Voltage);
-                SS.StrainTrace.push_back(VoxArray[i].GetMaxBondStrain());
-                SS.StressTrace.push_back(VoxArray[i].GetMaxBondStress());
-                SS.PressureTrace.push_back(VoxArray[i].CalcVoxelPressure());
-                SS.TouchTrace.push_back(VoxArray[i].GetCurGroundPenetration());
-                SS.RollTrace.push_back(VoxArray[i].GetRoll());
-                SS.PitchTrace.push_back(VoxArray[i].GetPitch());
-                SS.YawTrace.push_back(VoxArray[i].GetYaw());
+
+				LocalVXC.GetXYZNom(&x, &y, &z, StoXIndexMap[i]);
+
+				SS.VoltageTrace.push_back(StoXIndexMap[i]); 
+
+				SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
+
+				SS.RollTrace.push_back(x);
+				SS.PitchTrace.push_back(y);
+				SS.YawTrace.push_back(z);
+
+				SS.StrainTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().x);
+				SS.StressTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().y);
+				SS.PressureTrace.push_back(VoxArray[i].GetCurPosHighAccuracy().z);
+				SS.TouchTrace.push_back(VoxArray[i].GetCurGroundPenetration());
+
+                // SS.VoxelIndexTrace.push_back(VoxArray[i].GetNominalPosition());
+				// // SS.VoxelIndexTraceReference.push_back(VoxArray[i].GetSimIndex());
+                // SS.VoltageTrace.push_back(VoxArray[i].GetSimIndex()); // .Voltage
+                // SS.StrainTrace.push_back(VoxArray[i].GetMaxBondStrain());
+                // SS.StressTrace.push_back(VoxArray[i].GetMaxBondStress());
+                // SS.PressureTrace.push_back(VoxArray[i].CalcVoxelPressure());
+                // SS.TouchTrace.push_back(VoxArray[i].GetCurGroundPenetration());
+                // SS.RollTrace.push_back(VoxArray[i].GetRoll());
+                // SS.PitchTrace.push_back(VoxArray[i].GetPitch());
+                // SS.YawTrace.push_back(VoxArray[i].GetYaw());
             }
 
             SS.FloorTouchTrace.push_back(numTouchingGround);

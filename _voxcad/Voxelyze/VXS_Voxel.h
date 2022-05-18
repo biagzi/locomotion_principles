@@ -161,6 +161,10 @@ public:
     {
         return atan2(2.0*(Angle.w*Angle.z + Angle.x*Angle.y), 1.0 - 2.0*(Angle.y*Angle.y + Angle.z*Angle.z));
     }
+	const inline double GetPoss(void) const
+	{
+	    return (Pos.x,Pos.y,Pos.z);
+	}
 
     // Exteroception
     double LightIntensity;

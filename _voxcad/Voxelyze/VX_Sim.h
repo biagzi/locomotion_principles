@@ -39,6 +39,8 @@ struct SimState { //Information about current simulation state:
 	std::vector< vfloat > CMTraceTime;
 
 	std::vector< Vec3D<vfloat> > VoxelIndexTrace;
+	
+	//std::vector<vfloat> VoxelIndexTraceReference;
 
     std::vector<vfloat> FloorTouchTrace;
 
