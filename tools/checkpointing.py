@@ -10,8 +10,9 @@ from tools.utils import natural_sort
 def continue_from_checkpoint(directory="tests_data", additional_gens=0, max_hours_runtime=29,
                              max_eval_time=60, time_to_try_again=30,
                              checkpoint_every=1, save_vxa_every=1,
-                             save_pareto=False, save_nets=False, save_lineages=False, batch_size=None):
-
+                             save_pareto=False, save_nets=False, save_lineages=False, batch_size=None,
+                             add_new_ind_fixed_shape = False,
+                                fixed_shape = None,TO_ENV = None):
     if os.path.isfile("./" + directory + "/RUNNING"):
         sub.call("touch {}/DUPLICATE".format(directory), shell=True)
         print "Duplicate job submitted"
@@ -40,8 +41,10 @@ def continue_from_checkpoint(directory="tests_data", additional_gens=0, max_hour
         np.random.set_state(numpy_random_state)
         max_gens = optimizer.max_gens + additional_gens
         if optimizer.pop.gen < max_gens:
-            optimizer.run(continued_from_checkpoint=True, max_hours_runtime=max_hours_runtime, max_gens=max_gens,
+            optimizer.run(continued_from_checkpoint=True,directory=directory, max_hours_runtime=max_hours_runtime, max_gens=max_gens,
                           max_eval_time=max_eval_time, time_to_try_again=time_to_try_again,
                           checkpoint_every=checkpoint_every, save_vxa_every=save_vxa_every,
                           save_lineages=save_lineages, save_nets=save_nets, save_pareto=save_pareto,
-                          batch_size=batch_size)
+                          batch_size=batch_size,
+                          add_new_ind_fixed_shape = add_new_ind_fixed_shape,
+                        fixed_shape = fixed_shape,TO_ENV=TO_ENV)
