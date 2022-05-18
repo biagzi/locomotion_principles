@@ -5,7 +5,7 @@ import inspect
 
 
 def create_new_children_through_mutation(pop, print_log, new_children=None, mutate_network_probs=None,
-                                         prob_generating_func=None, max_mutation_attempts=1500):
+                                         prob_generating_func=None, max_mutation_attempts=1500,fix_shape_for_a_while = 0):
     """Create copies, with modification, of existing individuals in the population.
 
     Parameters
@@ -45,6 +45,17 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
         for ind in pop:
 
             clone = copy.deepcopy(ind)
+            #Unfreeze shape netwokr if it is the time, or update the num of generations it is freezed
+            if fix_shape_for_a_while > 0: #R: if we are freezing mutations in 'shape' for x generations (so the robot can optimize its control)
+                if clone.fix_shape_count >= fix_shape_for_a_while: #if this lineage has the shape fixed for more than "fix_shape_for_a_while"  
+                    for network in clone.genotype:
+                        if network.output_node_names[0] == "shape":
+                            network.freeze = False
+                            clone.fix_shape_count = 0
+                            
+                            
+                elif clone.fix_shape_count > 0:
+                    clone.fix_shape_count += 1
 
             if prob_generating_func is not None:
                 mutate_network_probs = prob_generating_func()
@@ -61,7 +72,6 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
             else:
                 # use probability distribution
                 selection = np.random.random(len(clone.genotype)) < mutate_network_probs
-
             # don't select any frozen networks (used to freeze aspects of genotype during evolution)
             for idx in range(len(selection)):
                 if clone.genotype[idx].freeze or clone.genotype[idx].switch:  # also don't select a switch
@@ -76,6 +86,8 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
                         break
             # it's possible that none are selected if using learning trials and the only unfrozen nets are also switches
 
+            #R: selection is an array, example: array([ True, False])
+            #R: selected networks for mutation, it is a list of the idx of the networks selected. For example, for selection = array([ True, False]), it is [0]
             selected_networks = np.arange(len(clone.genotype))[selection].tolist()
 
             for rank, goal in pop.objective_dict.items():
@@ -96,7 +108,10 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
 
             # old_individual = copy.deepcopy(clone)
 
-            for selected_net_idx in selected_networks:
+            #R: For each number in the list (selected_networks)
+            MUTATION_IN_SHAPE = False
+
+            for selected_net_idx in selected_networks:                        
                 mutation_counter = 0
                 done = False
                 while not done:
@@ -105,14 +120,17 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
 
                     # perform mutation(s)
                     for _ in range(candidate.genotype[selected_net_idx].num_consecutive_mutations):
-                        if not clone.genotype[selected_net_idx].direct_encoding:
+                        if not clone.genotype[selected_net_idx].direct_encoding and not clone.genotype[selected_net_idx].direct_global_feature:
                             # using CPPNs
+                            # R: get the names and default arguments of the function:
                             mut_func_args = inspect.getargspec(candidate.genotype[selected_net_idx].mutate)
+                            # R: Put 0 in all the values of the args
                             mut_func_args = [0 for _ in range(1, len(mut_func_args.args))]  # this is correct.
-                            choice = random.choice(range(len(mut_func_args)))
-                            mut_func_args[choice] = 1
+                            choice = random.choice(range(len(mut_func_args))) #R: choose one of them randomly
+                            mut_func_args[choice] = 1 #R: put the number 1 to the value that has been choosen
+                            #R: Do just 1 mutation of the type selected randomly using the mut_func_args:
                             variation_type, variation_degree = candidate.genotype[selected_net_idx].mutate(*mut_func_args)
-                        else:
+                        elif not clone.genotype[selected_net_idx].direct_global_feature:
                             # direct encoding with possibility of evolving mutation rate
                             # TODO: enable cppn mutation rate evolution
                             rate = None
@@ -125,6 +143,9 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
                             else:
                                 # this is the mutation rate itself (use predefined meta-mutation rate)
                                 variation_type, variation_degree = candidate.genotype[selected_net_idx].mutate()
+                        
+                        else:
+                            variation_type, variation_degree = candidate.genotype[selected_net_idx].mutate()
 
                     if variation_degree != "":
                         candidate.variation_type = "{0}({1})".format(variation_type, variation_degree)
@@ -132,9 +153,17 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
                         candidate.variation_type = str(variation_type)
                     candidate.genotype.express()
 
+                    if variation_type == "Different_global_stiffnes":
+                        done = True
+                        clone = copy.deepcopy(candidate)
+                        
                     if candidate.genotype[selected_net_idx].allow_neutral_mutations:
                         done = True
                         clone = copy.deepcopy(candidate)  # SAM: ensures change is made to every net
+                        if fix_shape_for_a_while > 0:
+                            if clone.genotype[selected_net_idx].output_node_names[0] == "shape":
+                                clone.genotype[selected_net_idx].freeze = True
+                                clone.fix_shape_count = 1
                         break
                     else:
                         for name, details in candidate.genotype.to_phenotype_mapping.items():
@@ -144,6 +173,10 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
                             if np.any(changes) and candidate.phenotype.is_valid():
                                 done = True
                                 clone = copy.deepcopy(candidate)  # SAM: ensures change is made to every net
+                                if fix_shape_for_a_while > 0:
+                                    if clone.genotype[selected_net_idx].output_node_names[0] == "shape":
+                                        clone.genotype[selected_net_idx].freeze = True
+                                        clone.fix_shape_count = 1
                                 break
                         # for name, details in candidate.genotype.to_phenotype_mapping.items():
                         #     if np.sum( details["old_state"] != details["state"] ) and candidate.phenotype.is_valid():
@@ -160,7 +193,7 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
 
                 # end while
 
-                if not clone.genotype[selected_net_idx].direct_encoding:
+                if not clone.genotype[selected_net_idx].direct_encoding and not clone.genotype[selected_net_idx].direct_global_feature:
                     for output_node in clone.genotype[selected_net_idx].output_node_names:
                         clone.genotype[selected_net_idx].graph.node[output_node]["old_state"] = ""
 
@@ -168,6 +201,8 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
             for rank, goal in pop.objective_dict.items():
                 if goal["tag"] is not None:
                     setattr(clone, goal["name"], goal["worst_value"])
+
+            
 
             if pop.learning_trials <= 1:  # default is zero but one is equivalent for now
                 clone.id = pop.max_id
@@ -183,33 +218,6 @@ def create_new_children_through_mutation(pop, print_log, new_children=None, muta
 
                 new_children += pop.get_learning_trials_for_single_ind(clone)
 
-                # this_learning_id = int(pop.max_id)
-                #
-                # for trial in range(pop.learning_trials):
-                #     learner = copy.deepcopy(clone)
-                #     learner.md5 = learner.learning_md5[trial]
-                #     learner.learning_id = this_learning_id  # same for all trials with this genotype
-                #     learner.id = pop.max_id
-                #     pop.max_id += 1
-                #
-                #     for this_net in learner.genotype:
-                #         if this_net.switch:
-                #             this_morphology = pop.learning_morphology[trial]
-                #             this_input = pop.learning_data[trial]
-                #             this_net.update(this_morphology, this_input)
-                #
-                #     learner.genotype.express()
-                #     new_children.append(learner)
-
-        # SAM: random individuals are now added in algorithms.py after mutation
-        # while len(new_children) < spots_to_fill:
-        #     valid = False
-        #     while not valid:
-        #         ind = softbot_class(pop.max_id, pop.objective_dict, pop.genotype, pop.phenotype)
-        #         if ind.phenotype.is_valid():
-        #             new_children.append(ind)
-        #             pop.max_id += 1
-        #             valid = True
 
     return new_children
 
