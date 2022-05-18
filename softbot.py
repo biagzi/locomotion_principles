@@ -12,7 +12,7 @@ class Genotype(object):
 
     NET_DICT = None  # used to create new individuals with presupposed features
 
-    def __init__(self, orig_size_xyz=(6, 6, 6)):
+    def __init__(self, orig_size_xyz=(6, 6, 6),bias_param = 1):
 
         """
         Parameters
@@ -23,6 +23,7 @@ class Genotype(object):
 
         """
         self.networks = []
+        self.bias_param = bias_param
         self.all_networks_outputs = []
         self.to_phenotype_mapping = GenotypeToPhenotypeMap()
         self.orig_size_xyz = orig_size_xyz
@@ -66,39 +67,61 @@ class Genotype(object):
         network.switch = switch
         network.num_consecutive_mutations = num_consecutive_mutations
         self.networks += [network]
-        self.all_networks_outputs.extend(network.output_node_names)
+        self.all_networks_outputs.extend(network.output_node_names) #R: add all the elements of network.output_node_names to the end of all_networks_outputs
 
-    def express(self):
+    def express(self,bias_param = 1):
         """Calculate the genome networks outputs, the physical properties of each voxel for simulation"""
 
+        for network in self: #R: for each network of a ind.genotype
+            if not network.direct_encoding: #R: if is a CPPN network
+                if not network.direct_global_feature: 
+                    for name in network.graph.nodes():  #R:for each node in the network
+                        network.graph.node[name]["evaluated"] = False  # flag all nodes as unevaluated
+
+                    network.set_input_node_states(self.orig_size_xyz)  # reset the inputs 
+                                                                        #R: calculate the inputs to the networks
+                                                                        #R: x,y,z,d,b matrices have size (original_size_xyz)
+                                                                        #R: and are filled with different values depending on the original_size_xyz
+                                                                        #R: input_d is a matrix of the eucledean distance of matrices x,y and z
+                                                                        #R: b matrix is filled with ones
+
+                    #R: Each OUTPUT_node in the network has a ID releating it name ('shape' or 'muscleOrTissue') with the "state". "State" is the matrix resulted of the calculations                                          
+                    for name in network.output_node_names: #network.output_node_names = ['shape','muscleOrTissue'] or ['phaseoffset]
+                        network.graph.node[name]["state"] = np.zeros(self.orig_size_xyz)  # clear old outputs
+                        network.graph.node[name]["state"] = self.calc_node_state(network, name)  # calculate new outputs #R: this function propagates the inputs until they reach the output nodes
+                        # R: This result network.graph.node[name]["state"] will be transformed in a booleand Matrix in the make_material_tree
+
+
+        #R: This looping gives to the phenotype mapping the values calculeted in the genotype
         for network in self:
-            if not network.direct_encoding:
-                for name in network.graph.nodes():
-                    network.graph.node[name]["evaluated"] = False  # flag all nodes as unevaluated
+            for name in network.output_node_names:    #R: for each output node name
+                if name in self.to_phenotype_mapping:  #R: if there is a mapping between them (just in the case of phase offset)
+                    if not network.direct_encoding and not network.direct_global_feature: #R: if is CPPN
+                        self.to_phenotype_mapping[name]["state"] = network.graph.node[name]["state"] #R: [phase_offset] receives the value
+                    elif not network.direct_global_feature: 
+                        self.to_phenotype_mapping[name]["state"] = network.values #R: if is direct.enconding
+                    elif network.direct_global_feature:
+                        self.to_phenotype_mapping[name]["state"] = network.feature #R: if is direct.enconding
 
-                network.set_input_node_states(self.orig_size_xyz)  # reset the inputs
 
-                for name in network.output_node_names:
-                    network.graph.node[name]["state"] = np.zeros(self.orig_size_xyz)  # clear old outputs
-                    network.graph.node[name]["state"] = self.calc_node_state(network, name)  # calculate new outputs
+        #R: Create material matrix:
+        for name, details in self.to_phenotype_mapping.items(): #name = material and phase_offset
 
-        for network in self:
-            for name in network.output_node_names:
-                if name in self.to_phenotype_mapping:
-                    if not network.direct_encoding:
-                        self.to_phenotype_mapping[name]["state"] = network.graph.node[name]["state"]
-                    else:
-                        self.to_phenotype_mapping[name]["state"] = network.values
-
-        for name, details in self.to_phenotype_mapping.items():
             # details["old_state"] = copy.deepcopy(details["state"])
             # SAM: moved this to mutation.py prior to mutation attempts loop
-            if name not in self.all_networks_outputs:
-                details["state"] = np.ones(self.orig_size_xyz, dtype=details["output_type"]) * -999
-                if details["dependency_order"] is not None:
-                    for dependency_name in details["dependency_order"]:
-                        self.to_phenotype_mapping.dependencies[dependency_name]["state"] = None
 
+            if name not in self.all_networks_outputs: #R: this is True if the name is a result of more than one network and has dependencies(material depends on shape and muscleOrTissue)
+                                                    #R: in the self.all_networks_outputs = #['phase_offset', 'shape', 'muscleOrTissue']
+                
+                details["state"] = np.ones(self.orig_size_xyz, dtype=details["output_type"]) * -999
+                #R: details['state'] of "material" is this strange vector filled with -999. This is because in this case, it will be calculated in make_material_tree
+                if details["dependency_order"] is not None: #R: this is the case of 'material'
+                    for dependency_name in details["dependency_order"]: #R: for dependency_name = ['shape', 'muscleOrTissue']
+                        self.to_phenotype_mapping.dependencies[dependency_name]["state"] = None #R: the state of the dependencies is None
+                        #R: This to_phenotype_mapping.dependencies[dependency_name]["state"] will be a matrix of True and Falses
+            
+            #R: This first part was just cleaning and reseting to start the make_material_tree in the next looping 
+    
         # create material matrix
         # for name, details in self.to_phenotype_mapping.items():
         #     details["old_state"] = copy.deepcopy(details["state"])
@@ -111,30 +134,37 @@ class Genotype(object):
         #                 for dependency_name in details["dependency_order"]:
         #                     self.to_phenotype_mapping.dependencies[dependency_name]["state"] = None
 
+        #R: Enter inside this loop just if is 'material' (will create the material matrix):        
         for name, details in self.to_phenotype_mapping.items():
-            if details["dependency_order"] is not None:
-                details["state"] = details["func"](self)
+            if details["dependency_order"] is not None: #R: this is the case of 'material'
+                details["state"] = details["func"](self) #R: material[state] = func:make_material_tree
+        #R: in the end, the ['material']['state'] receives the result of make_material_tree(self) func
 
+    #R: calculate the output of the networks, using the input values 
     def calc_node_state(self, network, node_name):
         """Propagate input values through the network"""
+
         if network.graph.node[node_name]["evaluated"]:
             return network.graph.node[node_name]["state"]
 
         network.graph.node[node_name]["evaluated"] = True
-        input_edges = network.graph.in_edges(nbunch=[node_name])
+        input_edges = network.graph.in_edges(nbunch=[node_name]) #R: return a list of the input_edges in the output_node_names in the network. node=node_name
         new_state = np.zeros(self.orig_size_xyz)
 
-        for edge in input_edges:
-            node1, node2 = edge
+        for edge in input_edges: #R: for each edge that connects with the output_node_name
+            node1, node2 = edge #R: the edge is in format [node1(not node_name),node2(is node_name)], because it connects node1 with node2
             new_state += self.calc_node_state(network, node1) * network.graph.edge[node1][node2]["weight"]
+            #R: this first part of the RHS is the calc of all node_1 state, given other connections to it (to calc all the signs that propagate to it)
+            #R: multiplica node1 pelo peso entre node1 e node 2 and keep suming with other input paths. After all edges are summed, you will have a new node2 (node_name) value
 
-        network.graph.node[node_name]["state"] = new_state
+        network.graph.node[node_name]["state"] = new_state #R: gives to the node_name the new value
 
-        if node_name in self.to_phenotype_mapping:
-            if self.to_phenotype_mapping[node_name]["dependency_order"] is None:
-                return self.to_phenotype_mapping[node_name]["func"](new_state)
+        if node_name in self.to_phenotype_mapping: #R: if this is a value that is important to the phenotype (material or phase_offset)
+            if self.to_phenotype_mapping[node_name]["dependency_order"] is None: #R: and if it do not have dependency (if it is phase_offset case)
+                return self.to_phenotype_mapping[node_name]["func"](new_state) #R: return sigmoid applied to the new_state as a value 
 
-        return network.graph.node[node_name]["function"](new_state)
+        #R: if the code ir here is because is the "shape" and "muscleOrTissue" newtork and not the phase_offset
+        return network.graph.node[node_name]["function"](new_state) #R: apply the funcion sigmoid in this new_state and return the value
 
 
 class GenotypeToPhenotypeMap(object):
@@ -150,6 +180,7 @@ class GenotypeToPhenotypeMap(object):
         """to_phenotype_mapping.items() -> list of (key, value) pairs in mapping"""
         return [(key, self.mapping[key]) for key in self.mapping]
 
+    #__contains__ method defines how instances of class behave when they appear at right side of in and not in operator.
     def __contains__(self, key):
         """Return True if key is a key str in the mapping, False otherwise. Use the expression 'key in mapping'."""
         try:
@@ -157,10 +188,12 @@ class GenotypeToPhenotypeMap(object):
         except TypeError:
             return False
 
+    #it's just a construct of all python objects that you can set how length is calculated. 
     def __len__(self):
         """Return the number of mappings. Use the expression 'len(mapping)'."""
         return len(self.mapping)
 
+    #When using mapping[key] will return self.mapping[key]
     def __getitem__(self, key):
         """Return mapping for node with name 'key'.  Use the expression 'mapping[key]'."""
         return self.mapping[key]
@@ -172,6 +205,7 @@ class GenotypeToPhenotypeMap(object):
         new.__dict__.update(deepcopy(self.__dict__, memo))
         return new
 
+    #R: Map between some network(genotype) and some phenotype 
     def add_map(self, name, tag, func=sigmoid, output_type=float, dependency_order=None, params=None, param_tags=None,
                 env_kws=None, logging_stats=np.mean, age_zero_overwrite=None, switch_proportion=0, switch_name=None):
         """Add an association between a genotype output and a VoxCad parameter.
@@ -182,7 +216,7 @@ class GenotypeToPhenotypeMap(object):
             A network output node name from the genotype.
 
         tag : str
-            The tag used in parsing the resulting output from a VoxCad simulation.
+            The tag used in parsing the resulting output from a VoxCad simulation. 
             If this is None then the attribute is calculated outside of VoxCad (in Python only).
 
         func : func
@@ -239,6 +273,7 @@ class GenotypeToPhenotypeMap(object):
         if tag is not None:
             tag = xml_format(tag)
 
+       #Dictionary used to relate the name of the network if all it informations in the simularion 
         self.mapping[name] = {"tag": tag,
                               "func": func,
                               "dependency_order": dependency_order,
@@ -253,6 +288,7 @@ class GenotypeToPhenotypeMap(object):
                               "switch_proportion": switch_proportion,
                               "switch_name": switch_name}
 
+    #Function that defines a a dictionary containing the dependency informations
     def add_output_dependency(self, name, dependency_name, requirement, material_if_true=None, material_if_false=None):
         """Add a dependency between two genotype outputs.
 
@@ -304,7 +340,8 @@ class Phenotype(object):
 
         """
         self.genotype = genotype
-        self.genotype.express()
+        self.bias_param = genotype.bias_param
+        self.genotype.express(bias_param = self.bias_param)  #express the genotype in the phenotype
 
     def __deepcopy__(self, memo):
         """Override deepcopy to apply to class level attributes"""
@@ -324,9 +361,11 @@ class Phenotype(object):
         """
         for network in self.genotype:
             for output_node_name in network.output_node_names:
-                if not network.direct_encoding and np.isnan(network.graph.node[output_node_name]["state"]).any():
+                if not network.direct_encoding and (not network.direct_global_feature) and np.isnan(network.graph.node[output_node_name]["state"]).any():
                     return False
-                elif network.direct_encoding and np.isnan(network.values).any():
+                elif network.direct_encoding and (not network.direct_global_feature) and np.isnan(network.values).any():
+                    print (network.graph.node[output_node_name]["state"])
+                    exit()
                     return False
         return True
 
@@ -355,7 +394,6 @@ class SoftBot(object):
         """
         self.genotype = genotype()  # initialize new random genome
         self.phenotype = phenotype(self.genotype)  # calc phenotype from genome
-
         self.id = max_id
         self.md5 = "none"
         self.dominated_by = []  # other individuals in the population that are superior according to evaluation
@@ -369,13 +407,20 @@ class SoftBot(object):
         # self.learning_md5 = ["none"]*100
         self.target = None
         self.previously_aggregated = False
+        #number of generations we keep the shape fixed (just perform mutations in phase offset)
+        self.fix_shape_count = None
+        self.equal_inds_order = None
 
         # set the objectives as attributes of self (and parent)
         self.objective_dict = objective_dict
+
+        
         for rank, details in objective_dict.items():
             if details["name"] != "age":
                 setattr(self, details["name"], details["worst_value"])
             setattr(self, "parent_{}".format(details["name"]), details["worst_value"])
+
+        
 
     def __deepcopy__(self, memo):
         """Override deepcopy to apply to class level attributes"""
@@ -421,6 +466,8 @@ class Population(object):
         self.objective_dict = objective_dict
         self.best_fit_so_far = objective_dict[0]["worst_value"]
         self.lineage_dict = {}
+        self.lineage_fit_dict = {}
+        self.lineage_gen_dict = {}
         self.max_id = 0
         self.non_dominated_size = 0
         self.learning_trials = learning_trials
@@ -440,6 +487,7 @@ class Population(object):
                 else:
                     self.individuals += [ind]
 
+        #R: looping to add individuals in population
         while len(self) < pop_size * max(learning_trials, 1):
             self.add_random_individual()
 
@@ -499,22 +547,45 @@ class Population(object):
         """
         return self.individuals.sort(reverse=reverse, key=operator.attrgetter(key))
 
-    def add_random_individual(self):
-        valid = False
-        while not valid:
-            ind = SoftBot(self.max_id, self.objective_dict, self.genotype, self.phenotype)
+    #R: Function to add individuals in populations
+    def add_random_individual(self,add_new_ind_fixed_shape=False,fixed_shape = None,TO_ENV = None):
+        if add_new_ind_fixed_shape == False:
+            valid = False
+            while not valid:
+                ind = SoftBot(self.max_id, self.objective_dict, self.genotype, self.phenotype)
+                if ind.phenotype.is_valid():
+                    if self.learning_trials > 0:
+                        self.individuals += self.get_learning_trials_for_single_ind(ind)
+                    else:
+                        self.individuals.append(ind)
+                        self.max_id += 1
 
-            if ind.phenotype.is_valid():
-                if self.learning_trials > 0:
-                    self.individuals += self.get_learning_trials_for_single_ind(ind)
-                else:
-                    self.individuals.append(ind)
-                    self.max_id += 1
+                    if self.genotype.NET_DICT is not None:
+                        self.replace_ind_networks()
 
-                if self.genotype.NET_DICT is not None:
-                    self.replace_ind_networks()
+                    valid = True
+        else:
+            valid = False
+            while not valid:
+                ind = SoftBot(self.max_id, self.objective_dict, self.genotype, self.phenotype)
+                if TO_ENV == 'AQUA':
+                    STIFF = 5e5
+                elif TO_ENV == 'EARTH' or TO_ENV == 'MARS':
+                    STIFF = 5e7
+                ind.genotype[2].feature = STIFF
+                ind.genotype.networks[1] = fixed_shape
+                ind.genotype.express()
+                if ind.phenotype.is_valid():
+                    if self.learning_trials > 0:
+                        self.individuals += self.get_learning_trials_for_single_ind(ind)
+                    else:
+                        self.individuals.append(ind)
+                        self.max_id += 1
 
-                valid = True
+                    if self.genotype.NET_DICT is not None:
+                        self.replace_ind_networks()
+
+                    valid = True
 
     def replace_ind_networks(self):
         # this only works for a direct encoding
@@ -545,14 +616,26 @@ class Population(object):
                 if ind.parent_id > -1:
                     # parent already in dictionary
                     self.lineage_dict[ind.id] = [ind.parent_id] + self.lineage_dict[ind.parent_id]
+                    self.lineage_fit_dict[ind.id] = [ind.fitness] + self.lineage_fit_dict[ind.parent_id] #RE added
+                    self.lineage_gen_dict[ind.id] = [self.gen] + self.lineage_gen_dict[ind.parent_id] #RE added
                 else:
                     # randomly created ind has no parents
                     self.lineage_dict[ind.id] = []
+                    self.lineage_fit_dict[ind.id] = [] #RE added
+                    self.lineage_gen_dict[ind.id] = [] #RE added
 
         current_ids = [ind.id for ind in self]
         keys_to_remove = [key for key in self.lineage_dict if key not in current_ids]
         for key in keys_to_remove:
             del self.lineage_dict[key]
+        
+        keys_to_remove = [key for key in self.lineage_fit_dict if key not in current_ids] #RE added
+        for key in keys_to_remove: #RE added
+            del self.lineage_fit_dict[key] #RE added
+
+        keys_to_remove = [key for key in self.lineage_gen_dict if key not in current_ids] #RE added
+        for key in keys_to_remove: #RE added
+            del self.lineage_gen_dict[key] #RE added
 
     def get_learning_trials_for_single_ind(self, ind):
         """The individual is separated in N learners"""
@@ -644,7 +727,7 @@ class Population(object):
                 print "FITNESS WAS NAN, RESETTING IT TO:", self.objective_dict[0]["worst_value"]
 
         self.sort(key="id", reverse=True)  # (max) promotes neutral mutation
-        self.sort(key="age", reverse=False)  # (min) protects younger, undeveloped solutions
+        #self.sort(key="age", reverse=False)  # (min) protects younger, undeveloped solutions
 
         for rank in reversed(range(len(self.objective_dict))):
             if not self.objective_dict[rank]["logging_only"]:
@@ -670,8 +753,9 @@ class Population(object):
                 goal = self.objective_dict[rank]
                 # losses += [dominates(ind2, ind1, goal["name"], goal["maximize"])]  # ind2 dominates ind1?
                 wins += [dominates(ind1, ind2, goal["name"], goal["maximize"])]  # ind1 dominates ind2?
-        # return np.any(losses) and not np.any(wins)
+            # return np.any(losses) and not np.any(wins)
         return not np.any(wins)
+
 
     def calc_dominance(self):
         """Determine which other individuals in the population dominate each individual."""
