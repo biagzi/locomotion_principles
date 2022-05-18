@@ -2,11 +2,7 @@ from tools.utils import xml_format
 import numpy as np
 
 
-# TODO: classes should hold dictionaries of variables, vxa tags and values
-# TODO: remove most of the hard coded text from read_write_voxelyze.py and replace with a few loops
-# TODO: add method to VoxCadParams for organizing (nested) subsections in vxa files
-
-
+#The objetc class in python is the built-in function that enables object behaviour
 class VoxCadParams(object):
     """Container for VoxCad parameters."""
 
@@ -15,8 +11,10 @@ class VoxCadParams(object):
         self.new_param_tag_dict = {}
 
     def add_param(self, name, val, tag):
-        setattr(self, name, val)
+        #The setattr function sets the value of the attribute of an object.
+        setattr(self, name, val) #setattrobject, name, value
         self.new_param_tag_dict[name] = xml_format(tag)
+        # xml_format Ensures that tag is encapsulated inside angle brackets."
 
 
 class Sim(VoxCadParams):
@@ -25,7 +23,7 @@ class Sim(VoxCadParams):
     def __init__(self, self_collisions_enabled=True, simulation_time=10.5, dt_frac=0.9, stop_condition=2,
                  fitness_eval_init_time=0.5, actuation_start_time=0, equilibrium_mode=0, min_temp_fact=0.1,
                  max_temp_fact_change=0.00001, max_stiffness_change=10000, min_elastic_mod=5e006,
-                 max_elastic_mod=5e008, damp_evolved_stiffness=True):
+                 max_elastic_mod=5e008, damp_evolved_stiffness=True,fix_shape_for_a_while=0):
 
         VoxCadParams.__init__(self)
 
@@ -45,6 +43,7 @@ class Sim(VoxCadParams):
         self.min_elastic_mod = min_elastic_mod
         self.max_elastic_mod = max_elastic_mod
         self.damp_evolved_stiffness = damp_evolved_stiffness
+        self.fix_shape_for_a_while = fix_shape_for_a_while 
 
 
 class Env(VoxCadParams):
@@ -52,7 +51,7 @@ class Env(VoxCadParams):
 
     def __init__(self, frequency=4.0, gravity_enabled=1, grav_acc=-9.81, density=1e+006, temp_enabled=1,
                  floor_enabled=1, floor_slope=0.0, lattice_dimension=0.01, fat_stiffness=5e+006, bone_stiffness=5e+008,
-                 muscle_stiffness=5e+006, sticky_floor=0, time_between_traces=0, save_passive_data=False,
+                 muscle_stiffness=5e+006, sticky_floor=0, time_between_traces=0.0, save_passive_data=False,
                  actuation_variance=0, temp_amp=39, growth_amp=0, growth_speed_limit=0,
                  greedy_growth=False, greedy_threshold=0, squeeze_rate=0, constant_squeeze=False, squeeze_start=0.5,
                  squeeze_end=2, num_hurdles=0, space_between_hurdles=3, hurdle_height=1, hurdle_stop=np.inf,
@@ -207,7 +206,7 @@ class ObjectiveDict(dict):
             If tag is None then the objective is not computed in VoxCad and is instead calculated on an output of a
             network.
         output_node_name : str
-            The output node which node_func operates on.
+            The output node which node_func operates on. 
 
         logging_only : bool
             If True then don't use as objective, only to track statistics from the simulation.
