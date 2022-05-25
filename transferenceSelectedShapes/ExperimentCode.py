@@ -38,7 +38,7 @@ def return_ind(EXP_NAME,GEN,SEED,ind_id):
     return 
 
 SEED = int(sys.argv[1])
-SIZE = int(sys.argv[2])         #4
+N = int(sys.argv[2])         #4
 FROM_ENV = str(sys.argv[3])     #WATER, MARS, EARTH
 TO_ENV = str(sys.argv[4])       #WATER, MARS, EARTH
 gen = int(sys.argv[5])          
@@ -49,19 +49,14 @@ MAX_GENS = int(sys.argv[9])     #200
 EXTRA_GENS = int(sys.argv[10])  #0
 Inovation = str(sys.argv[11])   #True
 
-if Inovation == 'True':
-    Inovation = True
-    NUM_RANDOM_INDS = 5
-    ADD_NEW_IND_FIXED_SHAPE = True
-elif Inovation == 'False':
-    Inovation = False
-    NUM_RANDOM_INDS = 0
-    ADD_NEW_IND_FIXED_SHAPE = False
+
+NUM_RANDOM_INDS = 5
+ADD_NEW_IND_FIXED_SHAPE = True
 
 MAX_TIME = 10
 
 #Size of 3d Lattice that can be useds
-IND_SIZE = (SIZE,SIZE,SIZE)
+IND_SIZE = (N,N,N)
 MIN_PERCENT_FULL = 0.25
 
 POP_SIZE = 10
@@ -77,23 +72,20 @@ MAX_EVAL_TIME = 61
 SAVE_LINEAGES = False
 CHECKPOINT_EVERY = 1
 
-if DE == 'False':
-    TITLE_NAME = 'Final_{0}_{1}'.format(SIZE,FROM_ENV)
-elif DE == 'True':
-    TITLE_NAME = 'Final_{0}_{1}_DirectEncode'.format(SIZE,FROM_ENV)
+EXP_NAME = '{0}_{1}_CPPN'.format(N,FROM_ENV)
 
 try:
-    os.mkdir("/scratch/renatabb/TransferenceSelectedShapes/{0}/".format(TITLE_NAME))
+    os.mkdir("~/locomotion_principles/TransferenceSelectedShapes/{0}/".format(EXP_NAME))
 except OSError:
     print ("Creation of the directory failed. Check if the directory already exist.")
 
 try:
-    os.mkdir("/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}".format(TITLE_NAME,TO_ENV))
+    os.mkdir("/~/locomotion_principles/TransferenceSelectedShapes/{0}/to_{1}".format(EXP_NAME,TO_ENV))
 except OSError:
     print ("Creation of the directory failed. Check if the directory already exist.")
 
 try:
-    os.mkdir("/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}".format(TITLE_NAME,TO_ENV,SEED,ind))
+    os.mkdir("~/locomotion_principles/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}".format(EXP_NAME,TO_ENV,SEED,ind))
 except:
     print ("Creation of the directory failed. Check if the directory already exist.")
 
@@ -114,18 +106,13 @@ if GenotDE == 'False':
 
             self.add_network(CPPN(output_node_names=["phase_offset"]))
 
-            #Map the network in the phenoptic -> it will define the phase_offset in Voxcad
             self.to_phenotype_mapping.add_map(name="phase_offset", tag="<PhaseOffset>", logging_stats=None)
 
-
-            #Create the network responsible to shape and and define if is muscle or tissue (CPPN?)
             self.add_network(CPPN(output_node_names=["shape"]))
 
-            #Map the material (after shape and muscle or tissue) -> tag Data?
             self.to_phenotype_mapping.add_map(name="material", tag="<Data>", func=map_genotype_phenotype_CPPN, output_type=int,
                                             dependency_order=["shape"], logging_stats=None)
 
-            #Add dependency between shape and nothing: if ???
             self.to_phenotype_mapping.add_output_dependency(name="shape", dependency_name=None, requirement=None,
                                                             material_if_true="{0}".format(MATERIAL_TYPE), material_if_false="0")
             
@@ -187,11 +174,6 @@ class MyPhenotype(Phenotype):
                     return False
         return True
 
-if DE == 'False':
-    EXP_NAME = 'Final_Lp{0}_{1}/Final_Lp{0}_{1}'.format(SIZE,FROM_ENV)
-elif DE == 'True':
-    EXP_NAME = 'Final_Lp{0}_{1}_DirectEncode/Final_Lp{0}_{1}_DirectEncode'.format(SIZE,FROM_ENV)
-
 fixed_shape_model = return_ind(EXP_NAME,gen,SEED,ind)
 ORIGINAL_STIFF = fixed_shape_model.genotype[2].feature
 
@@ -206,28 +188,8 @@ fixed_shape_model.pareto_level = 0
 fixed_shape_model.selected = 0  # survived selection
 fixed_shape_model.variation_type = "copied from best of"  # (from parent)
 
-if Inovation == False:
-    if DE == 'False':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/CPPN".format(TITLE_NAME,TO_ENV,SEED,ind)
-    elif DE == 'True' and GenotDE=='False':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/DE_CPPN".format(TITLE_NAME,TO_ENV,SEED,ind)
-    elif DE == 'True' and GenotDE=='True':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/DE".format(TITLE_NAME,TO_ENV,SEED,ind)
-elif Inovation:
-    if DE == 'False':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/CPPN_Inovation".format(TITLE_NAME,TO_ENV,SEED,ind)
-        wrong_RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/CPPN_InovationWrong".format(TITLE_NAME,TO_ENV,SEED,ind)
-        try:
-            if not os.path.isdir(wrong_RUN_DIR):
-                os.rename(RUN_DIR,wrong_RUN_DIR)
-            #shutil.rmtree(RUN_DIR)
-        except:
-            pass
-    elif DE == 'True' and GenotDE=='False':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/DE_CPPN_Inovation".format(TITLE_NAME,TO_ENV,SEED,ind)
-    elif DE == 'True' and GenotDE=='True':
-        RUN_DIR = "/scratch/renatabb/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/DE_Inovation".format(TITLE_NAME,TO_ENV,SEED,ind)
 
+RUN_DIR = "~/locomotion_principles/TransferenceSelectedShapes/{0}/to_{1}/seed{2}-shape{3}/CPPN".format(EXP_NAME,TO_ENV,SEED,ind)
 
 if not os.path.isfile(RUN_DIR + "/pickledPops/Gen_0.pickle"):
 
