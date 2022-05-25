@@ -4,20 +4,18 @@ import os
 import sys
 import numpy as np
 import subprocess as sub
-from functools import partial
 import pickle
-import shutil
 
 sys.path.insert(0, os.path.abspath('~/locomotion_principles/'))
 
-from base import Sim, Env, ObjectiveDict
+from base import Sim, ObjectiveDict
 from networks import CPPN, DirectGlobalFeature, DirectEncoding
 from softbot import Genotype, Phenotype, Population
 from tools.algorithms import ParetoOptimizationDiversityChildrenAlternation
 from tools.checkpointing import continue_from_checkpoint
 from tools.utils import map_genotype_phenotype_CPPN, map_genotype_phenotype_direct_encode
 
-from data_analysis.AnalysisUtils import choose_my_env
+from data_analysis.BasicAnalysisUtils import choose_my_env
 
 
 sub.call("cp ~/locomotion_principles/_voxcad/voxelyzeMain/voxelyze .", shell=True)
