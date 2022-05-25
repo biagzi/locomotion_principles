@@ -17,7 +17,7 @@ from tools.algorithms import ParetoOptimizationDiversityChildrenAlternation
 from tools.checkpointing import continue_from_checkpoint
 from tools.utils import map_genotype_phenotype_CPPN, map_genotype_phenotype_direct_encode
 
-from data_analysis.change_ENV_STIFF_SIZE import choose_my_env
+from data_analysis.AnalysisUtils import choose_my_env
 
 
 sub.call("cp ~/locomotion_principles/_voxcad/voxelyzeMain/voxelyze .", shell=True)
@@ -25,7 +25,7 @@ sub.call("chmod 755 voxelyze", shell=True)
 
 
 def return_ind(EXP_NAME,GEN,SEED,ind_id):
-    pickle_loc = "/scratch/renatabb/{0}_{1}/pickledPops/Gen_{2}.pickle".format(EXP_NAME,SEED,GEN) 
+    pickle_loc = "~/locomotion_principles/exp/{0}/{0}_{1}/pickledPops/Gen_{2}.pickle".format(EXP_NAME,SEED,GEN) 
 
     with open(pickle_loc, 'rb') as handle:
         [optimizer, random_state, numpy_random_state] = pickle.load(handle)

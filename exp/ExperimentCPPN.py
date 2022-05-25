@@ -4,7 +4,6 @@ import os
 import sys
 import numpy as np
 import subprocess as sub
-from functools import partial
 
 from base import Sim, Env, ObjectiveDict
 from networks import CPPN, DirectGlobalFeature
@@ -20,7 +19,6 @@ sub.call("chmod 755 voxelyze", shell=True)
 SEED = int(sys.argv[1])
 MAX_TIME = float(sys.argv[2]) #max_hours_runtime
 
-
 ######################### Experiment Gravity Environment and Size #########################
 ###########################################################################################
 N = 4 #6,8  -> Size of 3d Lattice that can be used
@@ -29,7 +27,7 @@ IND_SIZE = (N,N,N)
 
 GRAV_ACC = -0.1 #-3.721, -9.81
 RUN_NAME = "Aquatic" #"Martians", "Terrestrial"
-RUN_DIR = "~/{0}_Water_CPPN/{0}_Water_CPPN_{1}".format(N,SEED) #Mars, Earth
+RUN_DIR = "~/locomotion_principles/exp/{0}_Water_CPPN/{0}_Water_CPPN_{1}".format(N,SEED) #Mars, Earth
 
 
 #########################################EA PARAMETERS ##################################################

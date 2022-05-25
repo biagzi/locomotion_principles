@@ -4,7 +4,6 @@ import os
 import sys
 import numpy as np
 import subprocess as sub
-from functools import partial
 
 from base import Sim, Env, ObjectiveDict
 from networks import DirectGlobalFeature, DirectEncoding
@@ -29,7 +28,7 @@ IND_SIZE = (N,N,N)
 
 GRAV_ACC = -0.1 #-3.721, -9.81
 RUN_NAME = "Aquatic" #"Martians", "Terrestrial"
-RUN_DIR = "~/{0}_Water_DE/{0}_Water_DE_{1}".format(N,SEED) #Mars, Earth
+RUN_DIR = "~/locomotion_principles/exp/{0}_Water_DE/{0}_Water_DE_{1}".format(N,SEED) #Mars, Earth
 
 
 #########################################EA PARAMETERS ##################################################

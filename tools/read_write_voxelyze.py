@@ -64,8 +64,6 @@ def read_voxlyze_results(population, print_log, filename="softbotsOutput.xml"):
 
 def write_voxelyze_file(sim, env, individual, run_directory, run_name):
 
-    # TODO: work in base.py to remove redundant static text in this function
-
     # obstacles: the following is used to freeze any elements not apart of the individual
     body_xlim = (0, individual.genotype.orig_size_xyz[0])
     body_ylim = (0, individual.genotype.orig_size_xyz[1])  # todo: if starting ind somewhere besides (0, 0)
@@ -402,10 +400,7 @@ def write_voxelyze_file(sim, env, individual, run_directory, run_name):
         </Environment>\n")
 
     #Defines the different material types in Palette
-    #Material ID = 1 = fat (passivee)
-    #Material ID = 2 = bone
-    #Material ID = 3 = muscle with phase 0.01 (CTE)
-    #Material ID = 4 = muscle with phase -0.01 (CTE)
+    #Material ID = 9 (this is the one we used)
     #And other types ...
     try:
         this_robot_stiffness = individual.genotype[2].feature

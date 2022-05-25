@@ -4,14 +4,12 @@ import cPickle
 import numpy as np
 import subprocess as sub
 from functools import partial
-from itertools import product, islice
 
-from es import PEPG
 from evaluation import evaluate_all
-from selection import pareto_selection, pareto_tournament_selection, parallel_hill_climber
-from mutation import create_new_children_through_mutation, genome_wide_mutation
+from selection import pareto_selection
+from mutation import create_new_children_through_mutation
 from logging import PrintLog, initialize_folders, make_gen_directories, write_gen_stats
-from diversity import diversity_check, diversity_check_in_children
+from diversity import diversity_check_in_children
 
 
 #Defines some of the objects will be used in run 
@@ -49,8 +47,6 @@ class Optimizer(object):
         raise NotImplementedError
 
 #run function here
-
-
 class PopulationBasedOptimizerDiversityAlternation(Optimizer):
     def __init__(self, sim, env, pop, selection_func, mutation_func,diversity_check_function = None,diversity_alternation_prob = 0.5):
         Optimizer.__init__(self, sim, env)
@@ -99,8 +95,8 @@ class PopulationBasedOptimizerDiversityAlternation(Optimizer):
 
         #If you are starting from generation zero
         if not continued_from_checkpoint:  # generation zero
-            self.directory = directory #the name of directoty given to this run. example: run_(seed)
-            self.name = name #the name given to this run. exemplo "Swimmers"
+            self.directory = directory 
+            self.name = name 
             self.num_random_inds = num_random_individuals #parameter about the number of new random individuals added in each generations. typical example = 1
             self.num_env_cycles = num_env_cycles #parameter to change environment. typical example = 1 (same environment always)
 
