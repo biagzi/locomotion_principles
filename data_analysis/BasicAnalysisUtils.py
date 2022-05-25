@@ -151,3 +151,53 @@ def choose_my_env(new_env):
         
     my_env = Env(temp_amp=TEMP_AMP, frequency=FREQ,lattice_dimension=VOXEL_SIZE, grav_acc=GRAV_ACC)
     return my_env
+
+
+def return_shape_po_fitness(seed, EXP_NAME,MAX_GEN,return_stiff = False, encode = "ASCII",exact = False):
+    
+    """
+    Returns all_fits_shape_po[ind] = {'fit','shape','po'}
+
+    if exact = True: all_fits_shape_po[ind] =  {'fit','shape','po','stiff'}
+    """
+
+    all_fits_shape_po = {}
+
+    if os.path.isfile("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed)) is True:
+        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'rb') as handle:
+            if encode == "ASCII":
+                all_gen_dict = pickle.load(handle)
+            else:
+                all_gen_dict = pickle.load(handle,encoding=encode)
+    else:
+        print ('do not found seed')
+        print ("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed))
+        return
+    
+    if return_stiff == False:
+        if exact == False:
+            for gen in all_gen_dict:
+                if gen <= MAX_GEN:
+                    for ind in all_gen_dict[gen]:
+                        fit, shape, po = all_gen_dict[gen][ind][0], all_gen_dict[gen][ind][1], all_gen_dict[gen][ind][2]
+                        all_fits_shape_po[ind] = {'fit':fit,'shape':shape,'po':po}
+        else:
+            for gen in all_gen_dict:
+                if gen == MAX_GEN:
+                    for ind in all_gen_dict[gen]:
+                        fit, shape, po = all_gen_dict[gen][ind][0], all_gen_dict[gen][ind][1], all_gen_dict[gen][ind][2]
+                        all_fits_shape_po[ind] = {'fit':fit,'shape':shape,'po':po}
+    else:
+        if exact == False:
+            for gen in all_gen_dict:
+                if gen <= MAX_GEN:
+                    for ind in all_gen_dict[gen]:
+                        fit, shape, po, stiff = all_gen_dict[gen][ind][0], all_gen_dict[gen][ind][1], all_gen_dict[gen][ind][2],all_gen_dict[gen][ind][4]
+                        all_fits_shape_po[ind] = {'fit':fit,'shape':shape,'po':po,'stiff':stiff}
+        else:
+            for gen in all_gen_dict:
+                if gen == MAX_GEN:
+                    for ind in all_gen_dict[gen]:
+                        fit, shape, po, stiff = all_gen_dict[gen][ind][0], all_gen_dict[gen][ind][1], all_gen_dict[gen][ind][2],all_gen_dict[gen][ind][4]
+                        all_fits_shape_po[ind] = {'fit':fit,'shape':shape,'po':po,'stiff':stiff}
+    return all_fits_shape_po
