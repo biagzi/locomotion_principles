@@ -213,7 +213,7 @@ for exp in DO_EXPS:
     if DO is True:
         from data_analysis.BasicAnalysisUtils import generate_dicts_allrobots_per_seed_with_stiff
         print("START - generating dicst")
-        generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,EXP_NAME,MAX_GEN,SEED_INIT,SEED_END)
+        generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,MAX_GEN,SEED_INIT,SEED_END)
         print('FINISH - all robots dict of {0}'.format(EXP_NAME))
 
 

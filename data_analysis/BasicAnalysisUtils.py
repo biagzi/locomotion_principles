@@ -32,25 +32,17 @@ def open_pop_from_pickle(exp_name,GEN,returnAllOptimizer = False):
     else: 
         return optimizer
 
-def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,TITLE_NAME,MAX_GEN,SEED_INIT,SEED_END,encode = 'ASCII'):
+def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,MAX_GEN,SEED_INIT,SEED_END,encode = 'ASCII'):
 
     """Go in all seeds of an experiment and generates a dict with all inds and this infos: [id]: {fitness, shape, phase_offset, parent_id, stiff} 
     for each generation. It simplifies the access to this data for further analysis.
     
     """
-    
-    try:
-        os.mkdir("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts".format(TITLE_NAME))
-    except OSError:
-        print ("Creation of the directory failed. Check if the directory already exist.")
-    else:
-        print ("Successfully created the directory ")
-
 
     for seed in range(SEED_INIT,SEED_END+1):
         exp_name = '{0}/{0}_{1}'.format(EXP_NAME,seed)
         
-        if os.path.isfile("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(TITLE_NAME,seed)) is False:
+        if os.path.isfile("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed)) is False:
 
             all_gen_dict = {}
             list_of_ids_this_seed = []
@@ -75,7 +67,7 @@ def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,TITLE_NAME,MAX_GEN,SEE
 
 
                     if gen%100 == 0:
-                        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(TITLE_NAME,seed), 'wb') as handle:
+                        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'wb') as handle:
                             pickle.dump(all_gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
                         print gen
                 
@@ -84,7 +76,7 @@ def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,TITLE_NAME,MAX_GEN,SEE
                     return 
                 
         else:
-            with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(TITLE_NAME,seed), 'rb') as handle:
+            with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'rb') as handle:
                 if encode == "ASCII":
                     all_gen_dict = pickle.load(handle)
                 else:
@@ -123,7 +115,7 @@ def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,TITLE_NAME,MAX_GEN,SEE
 
 
                         if gen%100 == 0:
-                            with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(TITLE_NAME,seed), 'wb') as handle:
+                            with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'wb') as handle:
                                 pickle.dump(all_gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
                             print gen
                     
@@ -133,7 +125,7 @@ def generate_dicts_allrobots_per_seed_with_stiff(EXP_NAME,TITLE_NAME,MAX_GEN,SEE
 
 
 
-        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(TITLE_NAME,seed), 'wb') as handle:
+        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'wb') as handle:
             pickle.dump(all_gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
             
         print 'finished seed {0}'.format(seed)
