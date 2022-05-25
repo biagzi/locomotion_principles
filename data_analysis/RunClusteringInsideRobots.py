@@ -239,14 +239,14 @@ for exp in DO_EXPS:
 ############################################  SNAPSHOT OF CLUSTERED ROBOTS #########################################################################################################
     DO = True
     if DO is True:
-        sys.path.insert(0, os.path.abspath('~/locomotion_principles/data_analysis/Clustering'.format(COMPUTER_NAME))) 
-        from clustering_plots_from_seeds import print_cluster_po_by_side
+
+        from Clustering.clustering_vizualization import print_cluster_po_by_side
         
         SEED = 1
         SAVE_FIG = True
         NUMBER_OF_FIGS = 30
         for I_VALUE in [1000,2000]:
-            print_cluster_po_by_side(SEED,I_VALUE, NUMBER_OF_FIGS,SIZE,EXP_NAME,MAX_GEN,COMPUTER_NAME,FOLDER_LOCATION,CLUSTERING_NAME,SAVE_FIG,encode=ENCODE)
+            print_cluster_po_by_side(SEED,I_VALUE, NUMBER_OF_FIGS,SIZE,EXP_NAME,MAX_GEN,CLUSTERING_NAME,SAVE_FIG,encode=ENCODE)
             print('FINISH PLOT SNAPSHOT CLUSTERED i value = {0}'.format(I_VALUE))
 
 
