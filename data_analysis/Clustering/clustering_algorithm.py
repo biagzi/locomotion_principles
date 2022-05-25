@@ -4,7 +4,8 @@ import sys
 import numpy as np
 from copy import deepcopy
 
-from data_analysis.RunClusteringInsideRobots import EXP_NAME
+from clustering_utils import save_cluster_seed, mean_po_per_cluster, replace_po_by_mean_po, phase_difference_inside_a_cluster
+
 
 def dbscan(X,eps = 1.55, min_samples = 2, metric_types=['SC']):
     """
@@ -79,7 +80,6 @@ def look_for_similar_neighbors(X,labels,out_index):
     return labels
 
 
-
 def dbscan_outliers(X,labels,eps, min_samples, metric_types=['SC']):
     from sklearn.cluster import DBSCAN
     """
@@ -124,36 +124,6 @@ def dbscan_outliers(X,labels,eps, min_samples, metric_types=['SC']):
     
     return new_labels, n_clusters, n_noise #, metric
 
-def phase_difference_inside_a_cluster(X_original,labels,n_clusters, threshold):
-    """
-    Check if the phase difference inside one cluster is less than the threshold (2 -> 0.2 = 10% of the range of values)
-    """
-        
-    clusters = {}
-    for i, label in enumerate(labels):
-        if label != -1:
-            if label in list(clusters):
-                clusters[label].append(X_original[i][3])
-            else:
-                clusters[label] = [X_original[i][3]]
-    
-    DO_AGAIN = False
-    TOTAL_DIF = 0
-    for label in clusters:
-        dif_this_clus = np.abs(np.max(clusters[label]) - np.min(clusters[label]))
-        TOTAL_DIF += dif_this_clus
-        if  dif_this_clus > threshold:
-            DO_AGAIN = True
-
-    if n_clusters <= 1:
-        DO_AGAIN = True
-        if n_clusters == 0:
-            TOTAL_DIF = 10000
-        else:
-            if dif_this_clus > 0.1:
-                TOTAL_DIF = dif_this_clus*10
-
-    return DO_AGAIN, TOTAL_DIF
 
 
 def core_clustering_algorithm(X_original,X_po,EPS,EPS_PO,MIN_SAMPLES,COARSE_GRAIN,cluster_results,ind_id,save_gen = [False,None],
@@ -276,55 +246,6 @@ def core_clustering_algorithm(X_original,X_po,EPS,EPS_PO,MIN_SAMPLES,COARSE_GRAI
             cluster_results[ind_id]['Eps-EpsPo'] = [used_eps,used_eps_po] 
     
     return cluster_results
-
-def open_cluster_seed(seed,EXP_NAME,CLUSTERING_NAME,encode = "ASCII",CLUSTERING_FOLDER_NAME ='clustering'):
-    """
-    Returns clustering_allX_results
-
-    clustering_allX_results[ind] = keys: 'labels','n_clusters', 'n_noise', 'gen'
-    """
-    with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/{1}/seeds_clustered_{2}/cluster_{2}_seed_{3}.pickle".format(EXP_NAME,CLUSTERING_FOLDER_NAME,CLUSTERING_NAME,seed), 'rb') as handle:
-        if encode == "ASCII":
-            clustering_allX_results = pickle.load(handle)
-        else:
-            clustering_allX_results = pickle.load(handle,encoding=encode)
-        
-    print ('finished recovering seed {0} cluster results'.format(seed))
-    
-    return clustering_allX_results
-
-
-def save_cluster_seed(clustering_allX_results,seed,EXP_NAME,CLUSTERING_NAME,CLUSTERING_FOLDER_NAME ='clustering'):
-    """Function to save the results of cluster one seed
-    """
-
-    with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/{1}/seeds_clustered_{2}/cluster_{2}_seed_{3}.pickle".format(EXP_NAME,CLUSTERING_FOLDER_NAME,CLUSTERING_NAME,seed), 'wb') as handle:
-        pickle.dump(clustering_allX_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
-    print ('finished saving seed {0}'.format(seed))
-
-
-def mean_po_per_cluster(X_po,labels):
-    """ Function that associated with each label the correspondent mean phase offset value"""
-    clusters_po_mean = {}
-    for i, label in enumerate(labels):
-        if label != -1:
-            if label in list(clusters_po_mean):
-                clusters_po_mean[label].append(X_po[i][0])
-            else:
-                clusters_po_mean[label] = [X_po[i][0]]
-    
-    for label in clusters_po_mean:
-        clusters_po_mean[label] = np.mean(clusters_po_mean[label])
-    
-    return clusters_po_mean
-
-def replace_po_by_mean_po(clusters_po_mean,X,labels,factor):
-    """ Function that returns a data structure X with the mean phase offset instead of the original phase offset"""
-    for i in range(len(X)):
-        if labels[i] != -1:
-            X[i][3] = factor*clusters_po_mean[labels[i]]
-    return X
 
 
 def processing_data_to_cluster_light_no_pt(seed, EXP_NAME, SIZE,MAX_GEN,encode = "ASCII",factor=1,return_gen= False):

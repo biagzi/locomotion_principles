@@ -222,6 +222,20 @@ for exp in DO_EXPS:
         print('FINISH Clustering')
 
 ##################################################################################################################################################################
+############################## CREATE TOPOLOGIC REPRESENTATION BY PROCESSING EACH CLUSTER SEED  #########################################################################################################
+    DO = True
+    if DO is True:
+        if os.path.isdir("~/locomotion_principles/data_analysis/exp_analysis/{0}/clustering/ProcessedClusterInfos".format(EXP_NAME)) is False:
+            os.mkdir("~/locomotion_principles/data_analysis/exp_analysis/{0}/clustering/ProcessedClusterInfos".format(EXP_NAME))
+        
+        from Clustering.topologic_representation import process_clusters
+
+        print('START Process clustering')
+        process_clusters(SEED_INIT,SEED_END,EXP_NAME,CLUSTERING_NAME,ENCODE,MAX_GEN,SIZE)
+        print('FINISH Process clustering')
+
+
+##################################################################################################################################################################
 ############################################  SNAPSHOT OF CLUSTERED ROBOTS #########################################################################################################
     DO = True
     if DO is True:
@@ -236,17 +250,5 @@ for exp in DO_EXPS:
             print('FINISH PLOT SNAPSHOT CLUSTERED i value = {0}'.format(I_VALUE))
 
 
-##################################################################################################################################################################
-############################################  PROCESS EACH CLUSTER SEED DATA #########################################################################################################
-    DO = True
-    if DO is True:
-        sys.path.insert(0, os.path.abspath('~/locomotion_principles/data_analysis/Clustering'.format(COMPUTER_NAME))) 
-        if os.path.isdir("~/locomotion_principles/data_analysis/exp_analysis/{0}/clustering/ProcessedClusterInfos".format(EXP_NAME,COMPUTER_NAME)) is False:
-            os.mkdir("~/locomotion_principles/data_analysis/exp_analysis/{0}/clustering/ProcessedClusterInfos".format(EXP_NAME,COMPUTER_NAME))
-        
-        from calc_and_connect_clusters import process_clusters
 
-        print('START Process clustering')
-        process_clusters(SEED_INIT,SEED_END,EXP_NAME,COMPUTER_NAME,FOLDER_LOCATION,CLUSTERING_NAME,ENCODE,MAX_GEN,SIZE)
-        print('FINISH Process clustering')
 
