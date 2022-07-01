@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import pickle
 import networkx as nx
+from basic_analysis_utils import return_fit_stiff
 
-
-def TopologyCalcs(seed, TITLE_NAME,MAX_GEN,CLUSTERING_NAME,encode):
+def TopologyCalcs(seed, EXP_NAME,MAX_GEN,CLUSTERING_NAME,encode):
 
     all_fits = []
     all_stiffs = []
@@ -15,13 +15,14 @@ def TopologyCalcs(seed, TITLE_NAME,MAX_GEN,CLUSTERING_NAME,encode):
     all_avg_deg = []
     all_avg_deg_Calculated = []
     
-    with open("/{3}/{2}/reconfigurable_organisms/data_analysis/exp_analysis/{0}/clustering/ProcessedClusterInfos/ProcessedClusters_{4}_seed{1}.pickle".format(TITLE_NAME,seed,COMPUTER_NAME,FOLDER_LOCATION,CLUSTERING_NAME), 'rb') as handle:
+    ProcessedClusterInfos_location = "exp_analysis/{0}/clustering/ProcessedClusterInfos".format(EXP_NAME)
+    with open("/~/locomotion_principles/data_analysis/{0}/ProcessedClusters_{1}_seed{2}.pickle".format(ProcessedClusterInfos_location,CLUSTERING_NAME,seed), 'rb') as handle:
         if encode== "ASCII":
             clusters_processed = pickle.load(handle)
         else:
             clusters_processed = pickle.load(handle,encoding=encode)
 
-    all_ind_fit,all_ind_stiff = return_fit_stiff(seed,TITLE_NAME,MAX_GEN,COMPUTER_NAME,encode = encode)
+    all_ind_fit, all_ind_stiff = return_fit_stiff(seed, EXP_NAME,MAX_GEN)
 
     
     for ind_id in all_ind_fit:
