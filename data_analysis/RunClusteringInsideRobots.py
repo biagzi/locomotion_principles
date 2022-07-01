@@ -6,12 +6,12 @@ DO_EXPS = []
 for args_indx in range(1,len(sys.argv)):
     DO_EXPS.append(str(sys.argv[args_indx]))
 
-NORMALIZED = 3.2
 
 #PYTHON 3
 ENCODE = 'latin1'
 print('Using python {0}'.format(sys.version_info[0]))
 
+NORMALIZED = 1
 for exp in DO_EXPS:
     if exp == '4.w':
         EXP_NAME = '4_Water_CPPN'
