@@ -1,6 +1,9 @@
 import numpy as np
 import pickle
 import os
+import sys
+COMPUTER_NAME = '/home/renata'
+sys.path.append('{0}/locomotion_principles/'.format(COMPUTER_NAME))
 from data_analysis.Clustering.clustering_utils import open_cluster_seed
 
 def return_fit_stiff_nclusters(seed,EXP_NAME,MAX_GEN,CLUSTERING_NAME,encode = 'latin1'):
