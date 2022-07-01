@@ -2,8 +2,36 @@ import numpy as np
 import pandas as pd
 import pickle
 import networkx as nx
-from basic_analysis_utils import return_fit_stiff
 
+def return_fit_stiff(seed, EXP_NAME,MAX_GEN,encode = "ASCII"):
+    
+    """
+    Returns all_fit, all_stiff
+
+    """
+    all_fit = {}
+    all_stiff = {}
+
+    if os.path.isfile("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed)) is True:
+        with open("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed), 'rb') as handle:
+            if encode == "ASCII":
+                all_gen_dict = pickle.load(handle)
+            else:
+                all_gen_dict = pickle.load(handle,encoding=encode)
+    else:
+        print ('do not found seed')
+        print ("~/locomotion_principles/data_analysis/exp_analysis/{0}/seeds_dicts/seed_{1}.pickle".format(EXP_NAME,seed))
+        return
+    
+        
+    for gen in all_gen_dict:
+        if gen <= MAX_GEN:
+            for ind in all_gen_dict[gen]:
+                all_fit[ind] = all_gen_dict[gen][ind][0]
+                all_stiff[ind] = all_gen_dict[gen][ind][4]
+                
+    return all_fit, all_stiff
+    
 def TopologyCalcs(seed, EXP_NAME,MAX_GEN,CLUSTERING_NAME,encode):
 
     all_fits = []
