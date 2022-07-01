@@ -15,7 +15,7 @@ from tools.algorithms import ParetoOptimizationDiversityChildrenAlternation
 from tools.checkpointing import continue_from_checkpoint
 from tools.utils import map_genotype_phenotype_CPPN, map_genotype_phenotype_direct_encode
 
-from data_analysis.BasicAnalysisUtils import choose_my_env
+from data_analysis.basic_analysis_utils import choose_my_env
 
 
 sub.call("cp ~/locomotion_principles/_voxcad/voxelyzeMain/voxelyze .", shell=True)
