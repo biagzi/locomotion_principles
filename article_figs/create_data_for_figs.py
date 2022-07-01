@@ -5,6 +5,7 @@ import sys
 COMPUTER_NAME = '/home/renata'
 sys.path.append('{0}/locomotion_principles/'.format(COMPUTER_NAME))
 from data_analysis.Clustering.clustering_utils import open_cluster_seed
+from data_analysis.Clustering.topologic_analysis import TopologyCalcs
 
 def return_fit_stiff_nclusters(seed,EXP_NAME,MAX_GEN,CLUSTERING_NAME,encode = 'latin1'):
     """
@@ -79,3 +80,59 @@ def create_modules_data(ENV,SIZE,SEED_INIT,SEED_END, EXP_NAME,MAX_GEN,CLUSTERING
     
     with open("~/locomotion_principles/article_figs/Fig2/NumberModulesData/DictSegmentCalcs_{1}.pickle".format(EXP_NAME), 'wb') as handle:
             pickle.dump(d, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return d
+
+
+def create_avgdegree_data(ENV,SIZE,SEED_INIT,SEED_END, EXP_NAME,MAX_GEN,CLUSTERING_NAME):
+    all_fit,all_stiffs,all_avg_deg,all_edges_nodes, all_Nedges,all_density,all_node_connectivity,all_diameter = [],[],[],[],[],[],[],[]
+    all_strates= []
+    all_exp_names = []
+    all_fit_this_exp = []
+    for seed in range(SEED_INIT, SEED_END + 1):
+            print(seed)
+            fit,stiffs,Nedges,density,node_connectivity,diameter, edges_nodes, avg_deg = TopologyCalcs(seed, EXP_NAME,MAX_GEN,CLUSTERING_NAME,'latin1')
+
+            all_fit_this_exp.extend(fit)
+            all_stiffs.extend(stiffs)
+            all_edges_nodes.extend(edges_nodes)
+            all_avg_deg.extend(avg_deg)
+            all_Nedges.extend(Nedges)
+            all_density.extend(density)
+            all_node_connectivity.extend(node_connectivity)
+            all_diameter.extend(diameter)
+            all_exp_names.extend([ENV]*len(fit))
+
+    max_fit = np.max(all_fit_this_exp)
+    for fit in all_fit_this_exp:
+            strate = round(fit/max_fit,1)
+            if strate >= 0.8:
+                    all_strates.append('80-100%')
+            elif strate >= 0.6:
+                    all_strates.append('60-80%')
+            elif strate >= 0.4:
+                    all_strates.append('40-60%')
+            elif strate >= 0.2:
+                    all_strates.append('20-40%')
+            else:
+                    all_strates.append('0-20%')
+
+    all_fit.extend(all_fit_this_exp)
+    
+
+    d = {'Fitness': all_fit, 
+    'Stiffness': all_stiffs,
+    'Diameter': all_diameter,
+    'NodeConnectivity': all_node_connectivity,
+    'Nedges': all_Nedges,
+    'Density': all_density,
+    'AvgDegre':all_avg_deg, #2edges/nodes
+    'Edges/Nodes':all_avg_deg, #2edges/nodes
+    'FitStrate':all_strates,
+    'Env':all_exp_names
+    }
+    
+    with open("~/locomotion_principles/article_figs/Fig2/AvgDegreeData/TopologyCalcs_{1}.pickle".format(EXP_NAME), 'wb') as handle:
+            pickle.dump(d, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return d
