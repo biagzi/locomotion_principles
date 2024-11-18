@@ -1,12 +1,13 @@
-This work was forked from skriegman/reconfigurable_organisms.
-
+The code for this work was based starting from a forked repository from skriegman/reconfigurable_organisms.
 Original content (voxelyze engine and evolutionary algorithm implementation) was modified and new content was added (all files in exp and data_analyzis directory are new). The "reconfigurable_organisms" original content not used in this work was all deleted.
 
 Here is present the code necessary for replicating simulation, data analysis and plot the figures of the article: "Convergent evolution in silico
 reveals shape and dynamic principles of directed locomotion",[eLife](https://elifesciences.org/reviewed-preprints/87180).
 
-Starting from here is the original README text from "reconfigurable_organisms":
+In the folder "article_figs" you can find the data and the code to plot each one of the figures of the article.
 
+If you want to recriate the experiments, the code for it is available at the folder "exp", and the data analysis code is available in the folder "data_analysis".
+Starting from here is the original README text from "reconfigurable_organisms" that give instructions to install and use the software voxelyze (in the _voxcad folder):
 ""
 
 Installation
